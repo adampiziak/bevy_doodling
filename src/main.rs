@@ -1,6 +1,7 @@
 use bevy::{
     color::palettes::css::{BLUE, WHITE},
     dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
+    pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
     render::{
         Render, RenderApp, RenderSet,
@@ -44,9 +45,10 @@ fn main() {
                     ..Default::default()
                 },
             },
-            MaterialPlugin::<CustomMaterial>::default(),
+            MaterialPlugin::<ExtendedMaterial<StandardMaterial, CustomMaterial>>::default(),
             GpuReadbackPlugin,
             ExtractResourcePlugin::<ReadbackBuffer>::default(),
+            ExtractResourcePlugin::<NormalBuffer>::default(),
             // ExtractResourcePlugin::<ReadbackImage>::default(),
             ExtractResourcePlugin::<TerrainState>::default(),
         ))
@@ -57,25 +59,6 @@ fn main() {
         .add_systems(Update, compute_on_input)
         .add_systems(Startup, setup_camera)
         .run();
-}
-
-#[derive(Resource)]
-struct CustomMaterialHandle(Handle<CustomMaterial>);
-
-// This struct defines the data that will be passed to your shader
-#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-struct CustomMaterial {
-    #[storage(0, read_only)]
-    colors: Handle<ShaderStorageBuffer>,
-}
-impl Material for CustomMaterial {
-    fn vertex_shader() -> ShaderRef {
-        TERRAIN_SHADER_PATH.into()
-    }
-
-    // fn fragment_shader() -> ShaderRef {
-    //     TERRAIN_SHADER_PATH.into()
-    // }
 }
 
 #[derive(Resource, Default, ExtractResource, Clone)]
@@ -101,32 +84,6 @@ impl Default for TerrainStage {
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
 struct ComputeNodeLabel;
-
-// struct ComputePlugin {}
-// impl Plugin for ComputePlugin {
-//     fn build(&self, _app: &mut App) {}
-//     fn finish(&self, app: &mut App) {
-//         let rctx = app.sub_app_mut(RenderApp);
-//         let world = app.world_mut();
-
-//         let a = world.resource::<RenderDevice>();
-//         // let pass = a.create_command_encoder(desc)
-//         // let pass = a.co
-//         // let layout = a.create_bind_group_layout(
-//         //     None,
-//         //     &BindGroupLayoutEntries::sequential(
-//         //         ShaderStages::COMPUTE,
-//         //         (
-//         //             storage_buffer::<Vec<u32>>(false),
-//         //             storage_buffer::<Vec<u32>>(false),
-//         //         ),
-//         //     ),
-//         // );
-//         // let pipeline_cache = world.resource::<PipelineCache>();
-//         // let pipeline = pipeline_cache.queue_compute_pipeline(Com)
-//         // let shader = world.load_asset(SHADER_ASSET_PATH);
-//     }
-// }
 
 fn compute_on_input(
     mut commands: Commands,
@@ -223,19 +180,26 @@ impl render_graph::Node for ComputeNode {
 
 #[derive(Resource, ExtractResource, Clone)]
 struct ReadbackBuffer(Handle<ShaderStorageBuffer>);
+#[derive(Resource, ExtractResource, Clone)]
+struct NormalBuffer(Handle<ShaderStorageBuffer>);
 
 fn prepare_bind_group(
     mut commands: Commands,
     pipeline: Res<ComputePipeline>,
     render_device: Res<RenderDevice>,
     buffer: Res<ReadbackBuffer>,
+    normal_buffer: Res<NormalBuffer>,
     buffers: Res<RenderAssets<GpuShaderStorageBuffer>>,
 ) {
     let buffer = buffers.get(&buffer.0).unwrap();
+    let normal_buffer = buffers.get(&normal_buffer.0).unwrap();
     let bind_group = render_device.create_bind_group(
         None,
         &pipeline.layout,
-        &BindGroupEntries::single(buffer.buffer.as_entire_buffer_binding()),
+        &BindGroupEntries::sequential((
+            buffer.buffer.as_entire_buffer_binding(),
+            normal_buffer.buffer.as_entire_buffer_binding(),
+        )),
     );
     commands.insert_resource(GpuBufferBindGroup(bind_group));
 }
@@ -301,9 +265,12 @@ impl FromWorld for ComputePipeline {
         // let terrain_state = world.resource::<TerrainState>();
         let layout = render_device.create_bind_group_layout(
             None,
-            &BindGroupLayoutEntries::single(
+            &BindGroupLayoutEntries::sequential(
                 ShaderStages::COMPUTE,
-                storage_buffer::<Vec<[f32; 4]>>(false), // storage_buffer_sized(false, NonZero::new(202800)),
+                (
+                    storage_buffer::<Vec<[f32; 4]>>(false),
+                    storage_buffer::<Vec<[f32; 4]>>(false),
+                ),
             ),
         );
         let shader = world.load_asset(COMPUTE_SHADER_ASSET_PATH);
@@ -328,13 +295,34 @@ fn get_mesh_positions<'a>(mesh: &'a Mesh) -> Option<&'a Vec<[f32; 3]>> {
         return None;
     }
 }
+// This struct defines the data that will be passed to your shader
+
+#[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
+struct CustomMaterial {
+    #[storage(100, read_only)]
+    positions: Handle<ShaderStorageBuffer>,
+    #[storage(101, read_only)]
+    normals: Handle<ShaderStorageBuffer>,
+}
+impl MaterialExtension for CustomMaterial {
+    fn vertex_shader() -> ShaderRef {
+        TERRAIN_SHADER_PATH.into()
+    }
+
+    fn fragment_shader() -> ShaderRef {
+        TERRAIN_SHADER_PATH.into()
+    }
+    fn deferred_fragment_shader() -> ShaderRef {
+        TERRAIN_SHADER_PATH.into()
+    }
+}
 
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut buffers: ResMut<Assets<ShaderStorageBuffer>>,
-    mut custom_materials: ResMut<Assets<CustomMaterial>>,
+    mut custom_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CustomMaterial>>>,
 ) {
     // Terrain state
     let mut terrain_state = TerrainState::default();
@@ -346,20 +334,38 @@ fn setup(
         Dir3::new(Vec3::new(0.0, 1.0, 0.0)).unwrap(),
         Vec2::new(mesh_width, mesh_width),
     )
-    .subdivisions(128)
+    .subdivisions(166)
     .build();
 
+    let mut cust_mat = None;
     if let Some(vals) = get_mesh_positions(&mesh_plane) {
         terrain_state.buffer_size = vals.len();
         let uarray: Vec<[f32; 4]> = vals.into_iter().map(|p| [p[0], p[1], p[2], 1.0]).collect();
+        let ulen = uarray.len();
         let mut buffer = ShaderStorageBuffer::from(uarray);
+        let mut normal_buffer = ShaderStorageBuffer::from(vec![[0.0, 1.0, 0.0, 1.0]; ulen]);
         buffer.buffer_description.usage |= BufferUsages::COPY_SRC;
+        normal_buffer.buffer_description.usage |= BufferUsages::COPY_SRC;
         let buffer = buffers.add(buffer);
+        let normal_buffer = buffers.add(normal_buffer);
+        cust_mat = Some(ExtendedMaterial {
+            base: StandardMaterial::default(),
+            extension: CustomMaterial {
+                positions: buffer.clone(),
+                normals: normal_buffer.clone(),
+            },
+        });
         commands.insert_resource(ReadbackBuffer(buffer));
+        commands.insert_resource(NormalBuffer(normal_buffer));
     } else {
         panic!("CANNOT EXTRACT VALS");
     }
+    let Some(mat) = cust_mat else {
+        panic!("NO MATERIAL");
+    };
+    let mat_handle = custom_materials.add(mat);
     commands.insert_resource(terrain_state);
+    // let mat = CustomMaterial {positions: }
 
     let chunks = 1;
     let chunk_sep = mesh_width + 5.0;
@@ -368,7 +374,7 @@ fn setup(
         for y in 0..chunks {
             commands.spawn((
                 Mesh3d(meshes.add(mesh_plane.clone())),
-                MeshMaterial3d(materials.add(Color::WHITE)),
+                MeshMaterial3d(mat_handle.clone()),
                 Transform::from_xyz(x as f32 * chunk_sep, 0.0, y as f32 * chunk_sep),
                 Terrain,
             ));
@@ -493,7 +499,7 @@ fn setup_camera(mut commands: Commands) {
     ));
     commands.spawn((
         DirectionalLight {
-            illuminance: 800.0,
+            illuminance: 8000.0,
 
             shadows_enabled: true,
             ..default()
