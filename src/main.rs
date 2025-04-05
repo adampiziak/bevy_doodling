@@ -16,10 +16,13 @@ use bevy::{
     },
     text::FontSmoothing,
 };
+use lod::{move_mock_camera, render_lod, setup_mock_camera};
 
 const COMPUTE_SHADER_ASSET_PATH: &str = "compute.wgsl";
 const TERRAIN_SHADER_PATH: &str = "terrain.wgsl";
 const BUFFER_LEN: usize = 16;
+
+mod lod;
 
 fn main() {
     App::new()
@@ -58,6 +61,9 @@ fn main() {
         // .add_systems(Update, update_mesh)
         .add_systems(Update, compute_on_input)
         .add_systems(Startup, setup_camera)
+        .add_systems(Startup, setup_mock_camera)
+        .add_systems(Update, move_mock_camera)
+        .add_systems(Update, render_lod)
         .run();
 }
 
@@ -367,7 +373,7 @@ fn setup(
     commands.insert_resource(terrain_state);
     // let mat = CustomMaterial {positions: }
 
-    let chunks = 1;
+    let chunks = 0;
     let chunk_sep = mesh_width + 5.0;
 
     for x in 0..chunks {
