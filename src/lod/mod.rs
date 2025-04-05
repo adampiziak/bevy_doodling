@@ -63,8 +63,9 @@ impl MeshNode {
 }
 
 const MESH_SUBDIVISIONS: u32 = 9;
-const TREE_DEPTH: usize = 6;
+const TREE_DEPTH: usize = 5;
 const MAP_SIZE: f32 = 256.0;
+const RANGE_MIN_DIS: f32 = 20.0;
 
 // type MeshGrid = [[f64; NODE_SIZE]; NODE_SIZE];
 
@@ -92,9 +93,8 @@ pub fn render_lod(
     };
 
     let mut ranges = Vec::new();
-    let min_dis: f32 = 20.0;
     for i in 0..TREE_DEPTH {
-        ranges.push(min_dis * 2.0_f32.powi(i as i32));
+        ranges.push(RANGE_MIN_DIS * 2.0_f32.powi(i as i32));
     }
 
     let mut bounding_spheres = Vec::new();
@@ -126,7 +126,7 @@ pub fn render_lod(
         let mesh = create_mesh_node(patch.size.x * 1.95);
         commands.spawn((
             Mesh3d(meshes.add(mesh)),
-            MeshMaterial3d(materials.add(Color::srgb(0.0, 0.0, 1.0 - patch.level as f32 * 0.2))),
+            MeshMaterial3d(materials.add(Color::srgb(0.0, 1.0 - patch.level as f32 * 0.3, 1.0))),
             Transform::from_xyz(patch.center.x, 10.0, patch.center.y),
             PatchLabel,
         ));
