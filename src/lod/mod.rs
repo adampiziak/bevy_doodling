@@ -10,6 +10,9 @@ use bevy::{
     render::mesh::{Mesh, Mesh3d, MeshBuilder, PlaneMeshBuilder},
 };
 use kdtree::KdTree;
+use rand::Rng;
+
+use crate::get_mesh_positions;
 
 struct MeshNode {
     center: Vec2,
@@ -60,8 +63,8 @@ impl MeshNode {
 }
 
 const MESH_SUBDIVISIONS: u32 = 9;
-const TREE_DEPTH: usize = 5;
-const MAP_SIZE: f32 = 128.0;
+const TREE_DEPTH: usize = 6;
+const MAP_SIZE: f32 = 256.0;
 
 // type MeshGrid = [[f64; NODE_SIZE]; NODE_SIZE];
 
@@ -71,7 +74,6 @@ fn create_mesh_node(size: f32) -> Mesh {
     let mesh = PlaneMeshBuilder::new(normal, size_vec)
         .subdivisions(MESH_SUBDIVISIONS)
         .build();
-
     mesh
 }
 
@@ -90,7 +92,7 @@ pub fn render_lod(
     };
 
     let mut ranges = Vec::new();
-    let min_dis: f32 = 30.0;
+    let min_dis: f32 = 20.0;
     for i in 0..TREE_DEPTH {
         ranges.push(min_dis * 2.0_f32.powi(i as i32));
     }
@@ -113,7 +115,7 @@ pub fn render_lod(
     );
 
     let mut patches = Vec::new();
-    select_lod(node, &mut patches, TREE_DEPTH - 1, &bounding_spheres);
+    select_lod(&node, &mut patches, TREE_DEPTH - 1, &bounding_spheres);
 
     // remove previous patches
     for entity in mesh_query.iter() {
@@ -121,10 +123,10 @@ pub fn render_lod(
     }
     println!("NUM PATCHES: {}", patches.len());
     for patch in patches {
-        let mesh = create_mesh_node(patch.size.x * 2.0);
+        let mesh = create_mesh_node(patch.size.x * 1.95);
         commands.spawn((
             Mesh3d(meshes.add(mesh)),
-            MeshMaterial3d(materials.add(Color::srgb(1.0 - patch.level as f32 * 0.2, 0.0, 0.0))),
+            MeshMaterial3d(materials.add(Color::srgb(0.0, 0.0, 1.0 - patch.level as f32 * 0.2))),
             Transform::from_xyz(patch.center.x, 10.0, patch.center.y),
             PatchLabel,
         ));
@@ -148,35 +150,38 @@ impl PatchInfo {
 }
 
 fn select_lod(
-    node: MeshNode,
+    node: &MeshNode,
     patches: &mut Vec<PatchInfo>,
     level: usize,
     ranges: &Vec<BoundingSphere>,
-) {
+) -> bool {
     let bounding_sphere = ranges[level];
 
     // Skip nodes not in current lodrange
     if !node.boundry.intersects(&bounding_sphere) {
-        return;
+        return false;
     }
 
     // Always add LOD0 within range
     if level == 0 {
         patches.push(PatchInfo::from_node(&node));
-        return;
+        return true;
     }
 
     // If node is only in 1 LOD range
     let next_bounding_sphere = ranges[level - 1];
     if !node.boundry.intersects(&next_bounding_sphere) {
         patches.push(PatchInfo::from_node(&node));
-        return;
+        return true;
     }
 
     // Otherwise, do more selecting
-    for child in node.children {
-        select_lod(child, patches, level - 1, ranges);
+    for child in &node.children {
+        if !select_lod(child, patches, level - 1, ranges) {
+            patches.push(PatchInfo::from_node(&child));
+        }
     }
+    return true;
 }
 
 #[derive(Component)]
@@ -194,11 +199,11 @@ pub fn setup_mock_camera(
         MockCamera,
     ));
 
-    let mesh = create_mesh_node(MAP_SIZE as f32);
-    commands.spawn((
-        Mesh3d(meshes.add(mesh)),
-        MeshMaterial3d(materials.add(Color::WHITE)),
-    ));
+    // let mesh = create_mesh_node(MAP_SIZE as f32);
+    // commands.spawn((
+    //     Mesh3d(meshes.add(mesh)),
+    //     MeshMaterial3d(materials.add(Color::WHITE)),
+    // ));
 }
 pub fn move_mock_camera(
     input: Res<ButtonInput<KeyCode>>,
