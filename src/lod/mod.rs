@@ -1,4 +1,5 @@
 use bevy::{
+    asset::RenderAssetUsages,
     color::palettes::{css::RED, tailwind::RED_500},
     ecs::{component::Component, system::Commands},
     math::{
@@ -6,13 +7,16 @@ use bevy::{
         bounding::{Aabb3d, BoundingSphere, IntersectsVolume},
         primitives::Cuboid,
     },
+    pbr::ExtendedMaterial,
     prelude::*,
-    render::mesh::{Mesh, Mesh3d, MeshBuilder, PlaneMeshBuilder},
+    render::mesh::{Indices, Mesh, Mesh3d, MeshBuilder, PlaneMeshBuilder, PrimitiveTopology},
 };
 use kdtree::KdTree;
 use rand::Rng;
 
-use crate::get_mesh_positions;
+use crate::{
+    CustomMaterial, EventTimer, NormalBuffer, PatchState, ReadbackBuffer, get_mesh_positions,
+};
 
 struct MeshNode {
     center: Vec2,
@@ -65,16 +69,34 @@ impl MeshNode {
 const MESH_SUBDIVISIONS: u32 = 9;
 const TREE_DEPTH: usize = 5;
 const MAP_SIZE: f32 = 256.0;
-const RANGE_MIN_DIS: f32 = 20.0;
+const RANGE_MIN_DIS: f32 = 10.0;
 
 // type MeshGrid = [[f64; NODE_SIZE]; NODE_SIZE];
 
+// fn create_mesh_node(size: f32) -> Mesh {
+//     let normal = Dir3::new(Vec3::new(0.0, 1.0, 0.0)).unwrap();
+//     let size_vec = Vec2::new(size, size);
+//     let mesh = PlaneMeshBuilder::new(normal, size_vec)
+//         .subdivisions(MESH_SUBDIVISIONS)
+//         .build();
+//     mesh
+// }
 fn create_mesh_node(size: f32) -> Mesh {
-    let normal = Dir3::new(Vec3::new(0.0, 1.0, 0.0)).unwrap();
-    let size_vec = Vec2::new(size, size);
-    let mesh = PlaneMeshBuilder::new(normal, size_vec)
-        .subdivisions(MESH_SUBDIVISIONS)
-        .build();
+    let mut positions = Vec::new();
+
+    positions.push([-1.0, 0.0, -1.0]);
+    positions.push([1.0, 0.0, -1.0]);
+    positions.push([-1.0, 0.0, 1.0]);
+    positions.push([1.0, 0.0, 1.0]);
+    for p in positions.iter_mut() {
+        p[0] *= size / 2.0;
+        p[2] *= size / 2.0;
+    }
+    let indices = vec![0, 2, 1, 1, 2, 3];
+    let mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_indices(Indices::U32(indices));
+
     mesh
 }
 
@@ -85,12 +107,22 @@ pub fn render_lod(
     mut commands: Commands,
     mock_camera: Query<&Transform, With<MockCamera>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    buffer: Res<ReadbackBuffer>,
+    normal_buffer: Res<NormalBuffer>,
     mesh_query: Query<Entity, With<PatchLabel>>,
+    time: Res<Time>,
+    mut timer: ResMut<EventTimer>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut custom_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CustomMaterial>>>,
 ) {
     let Ok(transform) = mock_camera.single() else {
         return;
     };
+
+    timer.field1.tick(time.delta());
+    if !timer.field1.just_finished() {
+        return;
+    }
 
     let mut ranges = Vec::new();
     for i in 0..TREE_DEPTH {
@@ -122,12 +154,25 @@ pub fn render_lod(
         commands.entity(entity).despawn();
     }
     println!("NUM PATCHES: {}", patches.len());
+
+    let mesh = create_mesh_node(MAP_SIZE / 32.0);
+    let mesh_handle = meshes.add(mesh);
+    let cust_mat = ExtendedMaterial {
+        base: StandardMaterial::default(),
+        extension: CustomMaterial {
+            positions: buffer.0.clone(),
+            normals: normal_buffer.0.clone(),
+            level: PatchState::new(0 as u32),
+        },
+    };
+    let mat_handle = custom_materials.add(cust_mat);
     for patch in patches {
-        let mesh = create_mesh_node(patch.size.x * 1.95);
+        let scale = 2.0_f32.powf(patch.level as f32 + 1.0) - 0.02;
         commands.spawn((
-            Mesh3d(meshes.add(mesh)),
-            MeshMaterial3d(materials.add(Color::srgb(0.0, 1.0 - patch.level as f32 * 0.3, 1.0))),
-            Transform::from_xyz(patch.center.x, 10.0, patch.center.y),
+            Mesh3d(mesh_handle.clone()),
+            MeshMaterial3d(mat_handle.clone()),
+            Transform::from_xyz(patch.center.x, 10.0, patch.center.y)
+                .with_scale(Vec3::new(scale, 1.0, scale)),
             PatchLabel,
         ));
     }
@@ -195,7 +240,7 @@ pub fn setup_mock_camera(
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::default())),
         MeshMaterial3d(materials.add(Color::from(RED_500))),
-        Transform::from_xyz(0.0, 10.0, 0.0),
+        Transform::from_xyz(0.0, 30.0, 0.0),
         MockCamera,
     ));
 

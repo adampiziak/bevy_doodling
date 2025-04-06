@@ -24,6 +24,11 @@
 
 @group(2) @binding(100) var<storage, read> data: array<vec4f>;
 @group(2) @binding(101) var<storage, read> normals: array<vec4f>;
+struct PatchState {
+    level: u32,
+}
+@group(0) @binding(102) var<uniform> patch_state: PatchState;
+
 
 // struct Vertex {
 //     @builtin(instance_index) instance_index: u32,
@@ -67,8 +72,8 @@ struct Vertex {
 @vertex
 fn vertex(vertex_in: Vertex) -> VertexOutput {
     var vertex = vertex_in;
-    vertex.position[1] = data[vertex.index][1];
-    vertex.normal[1] = normals[vertex.index][1];
+    vertex.position[1] = data[(vertex.index) % 4][1];
+    // vertex.normal[1] = normals[vertex.index][1];
     var out: VertexOutput;
 
 

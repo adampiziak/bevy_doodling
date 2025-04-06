@@ -5,6 +5,7 @@ use bevy::{
     prelude::*,
     render::{
         Render, RenderApp, RenderSet,
+        extract_component::ExtractComponent,
         extract_resource::{ExtractResource, ExtractResourcePlugin},
         gpu_readback::{Readback, ReadbackComplete},
         mesh::{PlaneMeshBuilder, VertexAttributeValues},
@@ -17,12 +18,17 @@ use bevy::{
     text::FontSmoothing,
 };
 use lod::{move_mock_camera, render_lod, setup_mock_camera};
+use rand::distr::uniform;
 
 const COMPUTE_SHADER_ASSET_PATH: &str = "compute.wgsl";
 const TERRAIN_SHADER_PATH: &str = "terrain.wgsl";
 const BUFFER_LEN: usize = 16;
 
 mod lod;
+#[derive(Resource)]
+pub struct EventTimer {
+    pub field1: Timer,
+}
 
 fn main() {
     App::new()
@@ -55,6 +61,9 @@ fn main() {
             // ExtractResourcePlugin::<ReadbackImage>::default(),
             ExtractResourcePlugin::<TerrainState>::default(),
         ))
+        .insert_resource(EventTimer {
+            field1: Timer::from_seconds(0.8, TimerMode::Repeating),
+        })
         .add_systems(Startup, setup)
         // .add_systems(Startup, setup_compute)
         .add_systems(Update, move_player)
@@ -303,12 +312,25 @@ pub fn get_mesh_positions<'a>(mesh: &'a Mesh) -> Option<&'a Vec<[f32; 3]>> {
 }
 // This struct defines the data that will be passed to your shader
 
+#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType, Debug, Reflect)]
+struct PatchState {
+    level: u32,
+}
+
+impl PatchState {
+    fn new(level: u32) -> Self {
+        Self { level }
+    }
+}
+
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
 struct CustomMaterial {
     #[storage(100, read_only)]
     positions: Handle<ShaderStorageBuffer>,
     #[storage(101, read_only)]
     normals: Handle<ShaderStorageBuffer>,
+    #[uniform(102)]
+    level: PatchState,
 }
 impl MaterialExtension for CustomMaterial {
     fn vertex_shader() -> ShaderRef {
@@ -359,6 +381,7 @@ fn setup(
             extension: CustomMaterial {
                 positions: buffer.clone(),
                 normals: normal_buffer.clone(),
+                level: PatchState::new(5),
             },
         });
         commands.insert_resource(ReadbackBuffer(buffer));
