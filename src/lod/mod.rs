@@ -15,7 +15,8 @@ use kdtree::KdTree;
 use rand::Rng;
 
 use crate::{
-    CustomMaterial, EventTimer, NormalBuffer, PatchState, ReadbackBuffer, get_mesh_positions,
+    CustomMaterial, EventTimer, MAP_SIZE, NormalBuffer, PatchState, RANGE_MIN_DIS, ReadbackBuffer,
+    TREE_DEPTH, get_mesh_positions,
 };
 
 struct MeshNode {
@@ -65,11 +66,6 @@ impl MeshNode {
         }
     }
 }
-
-const MESH_SUBDIVISIONS: u32 = 9;
-const TREE_DEPTH: usize = 5;
-const MAP_SIZE: f32 = 256.0;
-const RANGE_MIN_DIS: f32 = 10.0;
 
 // type MeshGrid = [[f64; NODE_SIZE]; NODE_SIZE];
 

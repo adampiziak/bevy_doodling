@@ -1,4 +1,5 @@
 use bevy::{
+    asset::RenderAssetUsages,
     color::palettes::css::{BLUE, WHITE},
     dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
     pbr::{ExtendedMaterial, MaterialExtension},
@@ -8,7 +9,7 @@ use bevy::{
         extract_component::ExtractComponent,
         extract_resource::{ExtractResource, ExtractResourcePlugin},
         gpu_readback::{Readback, ReadbackComplete},
-        mesh::{PlaneMeshBuilder, VertexAttributeValues},
+        mesh::{Indices, PlaneMeshBuilder, VertexAttributeValues},
         render_asset::RenderAssets,
         render_graph::{self, RenderGraph, RenderLabel},
         render_resource::{binding_types::storage_buffer, *},
@@ -18,7 +19,7 @@ use bevy::{
     text::FontSmoothing,
 };
 use lod::{move_mock_camera, render_lod, setup_mock_camera};
-use rand::distr::uniform;
+use rand::{Rng, distr::uniform, rng};
 
 const COMPUTE_SHADER_ASSET_PATH: &str = "compute.wgsl";
 const TERRAIN_SHADER_PATH: &str = "terrain.wgsl";
@@ -344,6 +345,60 @@ impl MaterialExtension for CustomMaterial {
         TERRAIN_SHADER_PATH.into()
     }
 }
+const MESH_SUBDIVISIONS: u32 = 9;
+const TREE_DEPTH: usize = 5;
+const MAP_SIZE: f32 = 256.0;
+const RANGE_MIN_DIS: f32 = 10.0;
+const MAP_WIDTH: usize = 600;
+const MAP_HEIGHT: usize = 600;
+
+fn coord2index(x: usize, z: usize) -> usize {
+    z * MAP_HEIGHT + x
+}
+
+fn index2coord(index: usize) -> (usize, usize) {
+    let x = index % MAP_HEIGHT;
+    let z = index / MAP_HEIGHT;
+    (x, z)
+}
+
+fn create_terrain_mesh() -> Mesh {
+    let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; MAP_HEIGHT * MAP_WIDTH];
+    let mut indices: Vec<u32> = Vec::new();
+
+    let mut rng = rng();
+    for i in 0..MAP_HEIGHT * MAP_WIDTH {
+        let (x, z) = index2coord(i);
+        positions[i as usize] = [x as f32, rng.random_range(0_f32..10.0), z as f32];
+    }
+
+    // create triangles
+    // go throw each row of mesh, and create triangles for row
+    // * ------ *
+    // | \      |
+    // |    \   |
+    // |       \|
+    // * ------ *
+    for row in 0..(MAP_HEIGHT - 1) {
+        for col in 0..(MAP_WIDTH - 1) {
+            let top_left = coord2index(row + 1, col) as u32;
+            let top_right = coord2index(row + 1, col + 1) as u32;
+            let bottom_left = coord2index(row, col) as u32;
+            let bottom_right = coord2index(row, col + 1) as u32;
+            let mut triangle1 = vec![top_left, bottom_left, bottom_right];
+            let mut triangle2 = vec![top_left, bottom_right, top_right];
+            indices.append(&mut triangle1);
+            indices.append(&mut triangle2);
+        }
+    }
+
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
+
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_indices(Indices::U32(indices));
+
+    mesh
+}
 
 fn setup(
     mut commands: Commands,
@@ -395,6 +450,13 @@ fn setup(
     let mat_handle = custom_materials.add(mat);
     commands.insert_resource(terrain_state);
     // let mat = CustomMaterial {positions: }
+
+    let terrain_mesh = create_terrain_mesh();
+    commands.spawn((
+        Mesh3d(meshes.add(terrain_mesh)),
+        MeshMaterial3d(materials.add(Color::WHITE)),
+        Terrain,
+    ));
 
     let chunks = 0;
     let chunk_sep = mesh_width + 5.0;
