@@ -7,8 +7,10 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let map_height = 600u;
     let x = global_id.x;
     let z = global_id.z;
-    let i = z + x*map_height;
-    data[i] -= 0.0001*f32(x)*f32(z);
+    // let i = (z-1u)*map_height + x - 1u;
+    let i = (z)*map_height + x;
+    // data[i] += 0.0000001*f32(x*z);
+        data[i] += 0.000001*f32(600u - x)*f32(600u - z);
     // normals[i][1] -= data[i][1]/100.0;
 }
 fn permute4(x: vec4f) -> vec4f { return ((x * 34. + 1.) * x) % vec4f(289.); }

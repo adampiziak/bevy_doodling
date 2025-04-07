@@ -81,15 +81,24 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let map_width = 600;
     let map_height = 600u;
     let pl = patch_state.level;
-    let scale =pow(1.1, f32(pl));
-    let x = u32(vertex.position[0]*scale) + u32(patch_state.offset_x);
-    let z = u32(vertex.position[2]*scale) + u32(patch_state.offset_y);
-    let i = z*map_height + x;
-    let height: f32 = data[i];
+    // let scale =pow(1.1, f32(pl));
+    let map_center = vec2f(300.0, 300.0);
+    // let x = vertex.position[0];
+    // let z = vertex.position[2];    // let i = z*map_height + x;
+    // let height = f32(patch_state.level)*5.0;
 
     // let a: f32 = textureLoad(texure, vec2u(x, z)).x;
-    vertex.position[1] = height;
-    // vertex.normal[1] = normals[vertex.index][1];
+    let offset = 600.0 / pow(2.0, f32(patch_state.level));
+    let xi = vertex.position[0] + patch_state.offset_x - offset + 300.0;
+    let zi = vertex.position[2] + patch_state.offset_y - offset + 300.0;
+    let x = xi - 300.0;
+    let z = zi - 300.0;
+
+    let i = u32(600.0*min(round(zi - 0.0), 599.0) + min(round(xi - 0.0), 599.0));
+    let height: f32 = data[i];
+
+    
+    vertex.position = vec3f(x, height, z);
     var out: VertexOutput;
 
 
@@ -126,7 +135,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 #endif
 
 #ifdef VERTEX_COLORS
-    out.color = vertex.color;
+    out.color = vertex.color*patch_state.level;
 #endif
 
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX

@@ -68,7 +68,7 @@ fn main() {
             ExtractResourcePlugin::<TerrainState>::default(),
         ))
         .insert_resource(EventTimer {
-            field1: Timer::from_seconds(0.1, TimerMode::Repeating),
+            field1: Timer::from_seconds(0.05, TimerMode::Repeating),
         })
         .add_systems(Startup, setup)
         // .add_systems(Startup, setup_compute)
@@ -358,10 +358,8 @@ impl MaterialExtension for CustomMaterial {
         TERRAIN_SHADER_PATH.into()
     }
 }
-const MESH_SUBDIVISIONS: u32 = 9;
 const TREE_DEPTH: usize = 5;
-const MAP_SIZE: f32 = 256.0;
-const RANGE_MIN_DIS: f32 = 50.0;
+const RANGE_MIN_DIS: f32 = 100.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
 
@@ -426,12 +424,17 @@ fn setup(
 
     let mesh_width = 20.0;
 
-    // let mesh_plane = PlaneMeshBuilder::new(
-    //     Dir3::new(Vec3::new(0.0, 1.0, 0.0)).unwrap(),
-    //     Vec2::new(mesh_width, mesh_width),
-    // )
-    // .subdivisions(166)
-    // .build();
+    let mesh_plane = PlaneMeshBuilder::new(
+        Dir3::new(Vec3::new(0.0, 1.0, 0.0)).unwrap(),
+        Vec2::new(MAP_WIDTH as f32, MAP_HEIGHT as f32),
+    )
+    .build();
+    // commands.spawn((
+    //     Mesh3d(meshes.add(mesh_plane)),
+    //     MeshMaterial3d(materials.add(Color::WHITE)),
+    //     Transform::from_xyz(0.0, -1.0, 0.0),
+    //     Terrain,
+    // ));
 
     // let terrain_mesh = create_terrain_mesh();
 
@@ -495,11 +498,6 @@ fn setup(
     // let mat = CustomMaterial {positions: }
 
     // let terrain_mesh = create_terrain_mesh();
-    // commands.spawn((
-    //     Mesh3d(meshes.add(terrain_mesh)),
-    //     MeshMaterial3d(materials.add(Color::WHITE)),
-    //     Terrain,
-    // ));
 
     // let chunks = 0;
     // let chunk_sep = mesh_width + 5.0;

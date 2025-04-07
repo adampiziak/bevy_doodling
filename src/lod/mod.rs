@@ -15,7 +15,7 @@ use kdtree::KdTree;
 use rand::{Rng, rng};
 
 use crate::{
-    CustomMaterial, EventTimer, HeightMapTexture, MAP_SIZE, NormalBuffer, PatchState,
+    CustomMaterial, EventTimer, HeightMapTexture, MAP_WIDTH, NormalBuffer, PatchState,
     RANGE_MIN_DIS, ReadbackBuffer, TREE_DEPTH, coord2index, get_mesh_positions, index2coord,
 };
 
@@ -77,7 +77,7 @@ impl MeshNode {
 //         .build();
 //     mesh
 const PATCH_WIDTH: usize = 40;
-const PATCH_HEIGHT: usize = 40;
+const PATCH_HEIGHT: usize = 10;
 fn patch_coord2index(x: usize, z: usize) -> usize {
     z * PATCH_HEIGHT + x
 }
@@ -87,17 +87,20 @@ fn patch_index2coord(index: usize) -> (usize, usize) {
     let z = index / PATCH_HEIGHT;
     (x, z)
 }
-// }
-fn create_terrain_mesh_node() -> Mesh {
+
+// Mesh for smallest patch
+fn create_terrain_mesh_node(level: usize) -> Mesh {
     let node_height = PATCH_HEIGHT;
     let node_width = node_height;
     let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; node_width * node_height];
     let mut indices: Vec<u32> = Vec::new();
+    let side_length =
+        MAP_WIDTH as f32 / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32) / (node_width - 1) as f32;
 
     // let mut rng = rng();
     for i in 0..node_width * node_height {
         let (x, z) = patch_index2coord(i);
-        positions[i as usize] = [x as f32, 5.0, z as f32];
+        positions[i as usize] = [x as f32 * side_length, 5.0, z as f32 * side_length];
     }
 
     // create triangles
@@ -195,12 +198,14 @@ pub fn render_lod(
     }
 
     let camera_center = transform.translation.xz();
-    let boundry_rect = Rect::new(-MAP_SIZE, -MAP_SIZE, MAP_SIZE, MAP_SIZE);
+    println!("CAMERA {:?}", camera_center);
+    let bwidth = MAP_WIDTH as f32;
+    // let boundry_rect = Rect::new(-bwidth, -bwidth, bwidth, bwidth);
 
-    let mut node = MeshNode::new(
+    let node = MeshNode::new(
         Vec2::new(0.0, 0.0),
         TREE_DEPTH - 1,
-        Vec3::new(MAP_SIZE / 2.0, 1.0, MAP_SIZE / 2.0),
+        Vec3::new(bwidth / 2.0, 1.0, bwidth / 2.0),
     );
 
     let mut patches = Vec::new();
@@ -209,9 +214,15 @@ pub fn render_lod(
     // remove previous patches
     println!("NUM PATCHES: {}", patches.len());
 
+    let mut patch_meshes = Vec::new();
+
+    for level in 0..TREE_DEPTH {
+        let mesh = create_terrain_mesh_node(level);
+        let mesh_handle = meshes.add(mesh);
+        patch_meshes.push(mesh_handle);
+    }
+
     // let hm_handle = texture_buffer.0.clone();
-    let mesh = create_terrain_mesh_node();
-    let mesh_handle = meshes.add(mesh);
     println!("SPAWN {frame_id}");
     for patch in patches {
         let pl = (TREE_DEPTH as i32 - patch.level as i32).max(0);
@@ -222,23 +233,20 @@ pub fn render_lod(
                 level: PatchState::new(pl as u32, patch.center.x, patch.center.y),
             },
         };
+        let w = MAP_WIDTH as f32 / 2.0_f32.powf((TREE_DEPTH - patch.level - 1) as f32);
         println!(
-            "PATCH LEVEL {} vs {}",
-            patch.level,
-            TREE_DEPTH - patch.level as usize
+            "PATCH LEVEL {}, CENTER {}, width: {w}",
+            patch.level, patch.center
         );
         let mat_handle = custom_materials.add(cust_mat);
         // let scale = 2.0_f32.powf(patch.level as f32 + 1.0) - 1.0;
-        let scale = 0.86 / 2.1 * (2.0_f32.powf(patch.level as f32));
+        // let scale = 0.86 / 2.1 * (2.0_f32.powf(patch.level as f32));
+        let scale = 1.0;
+        let mesh_handle = patch_meshes[patch.level].clone();
         commands.spawn((
-            Mesh3d(mesh_handle.clone()),
+            Mesh3d(mesh_handle),
             MeshMaterial3d(mat_handle.clone()),
-            Transform::from_xyz(
-                patch.center.x - PATCH_WIDTH as f32 / 2.0 * scale,
-                0.0,
-                patch.center.y - PATCH_HEIGHT as f32 / 2.0 * scale,
-            )
-            .with_scale(Vec3::new(scale, 1.0, scale)),
+            // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
             PatchLabel(frame_id),
         ));
     }
