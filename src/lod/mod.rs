@@ -76,8 +76,8 @@ impl MeshNode {
 //         .subdivisions(MESH_SUBDIVISIONS)
 //         .build();
 //     mesh
-const PATCH_WIDTH: usize = 20;
-const PATCH_HEIGHT: usize = 20;
+const PATCH_WIDTH: usize = 40;
+const PATCH_HEIGHT: usize = 40;
 fn patch_coord2index(x: usize, z: usize) -> usize {
     z * PATCH_HEIGHT + x
 }
@@ -212,23 +212,33 @@ pub fn render_lod(
     // let hm_handle = texture_buffer.0.clone();
     let mesh = create_terrain_mesh_node();
     let mesh_handle = meshes.add(mesh);
-    let cust_mat = ExtendedMaterial {
-        base: StandardMaterial::default(),
-        extension: CustomMaterial {
-            heightmap: buffer.0.clone(),
-            level: PatchState::new(0 as u32),
-        },
-    };
-    let mat_handle = custom_materials.add(cust_mat);
     println!("SPAWN {frame_id}");
     for patch in patches {
-        let scale = 2.0_f32.powf(patch.level as f32) - 1.0;
-        // let scale = 0.2;
+        let pl = (TREE_DEPTH as i32 - patch.level as i32).max(0);
+        let cust_mat = ExtendedMaterial {
+            base: StandardMaterial::default(),
+            extension: CustomMaterial {
+                heightmap: buffer.0.clone(),
+                level: PatchState::new(pl as u32, patch.center.x, patch.center.y),
+            },
+        };
+        println!(
+            "PATCH LEVEL {} vs {}",
+            patch.level,
+            TREE_DEPTH - patch.level as usize
+        );
+        let mat_handle = custom_materials.add(cust_mat);
+        // let scale = 2.0_f32.powf(patch.level as f32 + 1.0) - 1.0;
+        let scale = 0.86 / 2.1 * (2.0_f32.powf(patch.level as f32));
         commands.spawn((
             Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(mat_handle.clone()),
-            Transform::from_xyz(patch.center.x, 0.0, patch.center.y)
-                .with_scale(Vec3::new(scale, 1.0, scale)),
+            Transform::from_xyz(
+                patch.center.x - PATCH_WIDTH as f32 / 2.0 * scale,
+                0.0,
+                patch.center.y - PATCH_HEIGHT as f32 / 2.0 * scale,
+            )
+            .with_scale(Vec3::new(scale, 1.0, scale)),
             PatchLabel(frame_id),
         ));
     }
@@ -293,10 +303,11 @@ pub fn setup_mock_camera(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    let cscale = 10.0;
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::default())),
         MeshMaterial3d(materials.add(Color::from(RED_500))),
-        Transform::from_xyz(0.0, 30.0, 0.0),
+        Transform::from_xyz(0.0, 10.0, 0.0).with_scale(Vec3::new(cscale, cscale, cscale)),
         MockCamera,
     ));
 
@@ -315,7 +326,7 @@ pub fn move_mock_camera(
         return;
     };
 
-    let speed = 80.0;
+    let speed = 150.0;
     let translation = transform.translation;
 
     if input.pressed(KeyCode::ArrowUp) {

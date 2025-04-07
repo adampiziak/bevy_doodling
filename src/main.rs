@@ -68,7 +68,7 @@ fn main() {
             ExtractResourcePlugin::<TerrainState>::default(),
         ))
         .insert_resource(EventTimer {
-            field1: Timer::from_seconds(1.0, TimerMode::Repeating),
+            field1: Timer::from_seconds(0.1, TimerMode::Repeating),
         })
         .add_systems(Startup, setup)
         // .add_systems(Startup, setup_compute)
@@ -323,11 +323,17 @@ pub fn get_mesh_positions<'a>(mesh: &'a Mesh) -> Option<&'a Vec<[f32; 3]>> {
 #[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType, Debug, Reflect)]
 struct PatchState {
     level: u32,
+    offset_x: f32,
+    offset_y: f32,
 }
 
 impl PatchState {
-    fn new(level: u32) -> Self {
-        Self { level }
+    fn new(level: u32, offset_x: f32, offset_y: f32) -> Self {
+        Self {
+            level,
+            offset_x,
+            offset_y,
+        }
     }
 }
 
@@ -355,7 +361,7 @@ impl MaterialExtension for CustomMaterial {
 const MESH_SUBDIVISIONS: u32 = 9;
 const TREE_DEPTH: usize = 5;
 const MAP_SIZE: f32 = 256.0;
-const RANGE_MIN_DIS: f32 = 10.0;
+const RANGE_MIN_DIS: f32 = 50.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
 

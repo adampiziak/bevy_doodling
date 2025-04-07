@@ -27,6 +27,8 @@
 // @group(0) @binding(100) var texture: texture_storage_2d<r32float, read>;
 struct PatchState {
     level: u32,
+    offset_x: f32,
+    offset_y: f32,
 }
 // @group(2) @binding(100) var tex: texture_2d<f32>;
 // @group(2) @binding(101) var tex_sampler: sampler;
@@ -78,8 +80,10 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     var vertex = vertex_in;
     let map_width = 600;
     let map_height = 600u;
-    let x = u32(vertex.position[0]);
-    let z = u32(vertex.position[2]);
+    let pl = patch_state.level;
+    let scale =pow(1.1, f32(pl));
+    let x = u32(vertex.position[0]*scale) + u32(patch_state.offset_x);
+    let z = u32(vertex.position[2]*scale) + u32(patch_state.offset_y);
     let i = z*map_height + x;
     let height: f32 = data[i];
 
@@ -157,6 +161,7 @@ fn fragment(
     // apply in-shader post processing (fog, alpha-premultiply, and also tonemapping, debanding if the camera is non-hdr)
     // note this does not include fullscreen postprocessing effects like bloom.
     out.color = main_pass_post_lighting_processing(pbr_input, out.color);
+    out.color[2] = 1.0;
     return out;
 
 }
