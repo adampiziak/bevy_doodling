@@ -116,7 +116,7 @@ fn create_terrain_mesh_node() -> Mesh {
             let mut triangle1 = vec![top_left, bottom_left, bottom_right];
             // triangle1.reverse();
             let mut triangle2 = vec![top_left, bottom_right, top_right];
-            // triangle2.reverse();
+            triangle2.reverse();
             indices.append(&mut triangle1);
             indices.append(&mut triangle2);
         }
