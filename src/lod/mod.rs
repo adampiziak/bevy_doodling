@@ -222,12 +222,13 @@ pub fn render_lod(
     let mat_handle = custom_materials.add(cust_mat);
     println!("SPAWN {frame_id}");
     for patch in patches {
-        // let scale = 2.0_f32.powf(patch.level as f32 + 1.0) - 0.02;
+        let scale = 2.0_f32.powf(patch.level as f32) - 1.0;
+        // let scale = 0.2;
         commands.spawn((
             Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(mat_handle.clone()),
-            Transform::from_xyz(patch.center.x, 0.0, patch.center.y),
-            // .with_scale(Vec3::new(scale, 1.0, scale)),
+            Transform::from_xyz(patch.center.x, 0.0, patch.center.y)
+                .with_scale(Vec3::new(scale, 1.0, scale)),
             PatchLabel(frame_id),
         ));
     }

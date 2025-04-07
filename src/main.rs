@@ -193,7 +193,9 @@ impl render_graph::Node for ComputeNode {
 
             pass.set_bind_group(0, &bind_group.0, &[]);
             pass.set_pipeline(init_pipeline);
-            pass.dispatch_workgroups(MAP_WIDTH as u32, 1, MAP_HEIGHT as u32);
+            let workgroup_x = (MAP_WIDTH + 7) / 8;
+            let workgroup_z = (MAP_HEIGHT + 7) / 8;
+            pass.dispatch_workgroups(workgroup_x as u32, 1, workgroup_z as u32);
         }
         Ok(())
     }
