@@ -12,11 +12,11 @@ use bevy::{
     render::mesh::{Indices, Mesh, Mesh3d, MeshBuilder, PlaneMeshBuilder, PrimitiveTopology},
 };
 use kdtree::KdTree;
-use rand::Rng;
+use rand::{Rng, rng};
 
 use crate::{
-    CustomMaterial, EventTimer, MAP_SIZE, NormalBuffer, PatchState, RANGE_MIN_DIS, ReadbackBuffer,
-    TREE_DEPTH, get_mesh_positions,
+    CustomMaterial, EventTimer, HeightMapTexture, MAP_SIZE, NormalBuffer, PatchState,
+    RANGE_MIN_DIS, ReadbackBuffer, TREE_DEPTH, coord2index, get_mesh_positions, index2coord,
 };
 
 struct MeshNode {
@@ -76,7 +76,59 @@ impl MeshNode {
 //         .subdivisions(MESH_SUBDIVISIONS)
 //         .build();
 //     mesh
+const PATCH_WIDTH: usize = 20;
+const PATCH_HEIGHT: usize = 20;
+fn patch_coord2index(x: usize, z: usize) -> usize {
+    z * PATCH_HEIGHT + x
+}
+
+fn patch_index2coord(index: usize) -> (usize, usize) {
+    let x = index % PATCH_HEIGHT;
+    let z = index / PATCH_HEIGHT;
+    (x, z)
+}
 // }
+fn create_terrain_mesh_node() -> Mesh {
+    let node_height = PATCH_HEIGHT;
+    let node_width = node_height;
+    let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; node_width * node_height];
+    let mut indices: Vec<u32> = Vec::new();
+
+    // let mut rng = rng();
+    for i in 0..node_width * node_height {
+        let (x, z) = patch_index2coord(i);
+        positions[i as usize] = [x as f32, 5.0, z as f32];
+    }
+
+    // create triangles
+    // go throw each row of mesh, and create triangles for row
+    // * ------ * -------
+    // | \      |
+    // |    \   |  etc...
+    // |       \|
+    // * ------ * -------
+    for row in 0..(node_height - 1) {
+        for col in 0..(node_width - 1) {
+            let top_left = patch_coord2index(row + 1, col) as u32;
+            let top_right = patch_coord2index(row + 1, col + 1) as u32;
+            let bottom_left = patch_coord2index(row, col) as u32;
+            let bottom_right = patch_coord2index(row, col + 1) as u32;
+            let mut triangle1 = vec![top_left, bottom_left, bottom_right];
+            // triangle1.reverse();
+            let mut triangle2 = vec![top_left, bottom_right, top_right];
+            // triangle2.reverse();
+            indices.append(&mut triangle1);
+            indices.append(&mut triangle2);
+        }
+    }
+
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
+
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_indices(Indices::U32(indices));
+
+    mesh
+}
 fn create_mesh_node(size: f32) -> Mesh {
     let mut positions = Vec::new();
 
@@ -97,15 +149,16 @@ fn create_mesh_node(size: f32) -> Mesh {
 }
 
 #[derive(Component)]
-pub struct PatchLabel;
+pub struct PatchLabel(u32);
 
 pub fn render_lod(
     mut commands: Commands,
     mock_camera: Query<&Transform, With<MockCamera>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     buffer: Res<ReadbackBuffer>,
-    normal_buffer: Res<NormalBuffer>,
-    mesh_query: Query<Entity, With<PatchLabel>>,
+    // normal_buffer: Res<NormalBuffer>,
+    // texture_buffer: Res<HeightMapTexture>,
+    mesh_query: Query<(Entity, &PatchLabel)>,
     time: Res<Time>,
     mut timer: ResMut<EventTimer>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -118,6 +171,14 @@ pub fn render_lod(
     timer.field1.tick(time.delta());
     if !timer.field1.just_finished() {
         return;
+    }
+    let mut rng = rng();
+    let frame_id = rng.random_range(0_32..1000000);
+    for (entity, label) in mesh_query.iter() {
+        if label.0 != frame_id {
+            println!("DESPAWN {}", label.0);
+            commands.entity(entity).despawn();
+        }
     }
 
     let mut ranges = Vec::new();
@@ -146,30 +207,28 @@ pub fn render_lod(
     select_lod(&node, &mut patches, TREE_DEPTH - 1, &bounding_spheres);
 
     // remove previous patches
-    for entity in mesh_query.iter() {
-        commands.entity(entity).despawn();
-    }
     println!("NUM PATCHES: {}", patches.len());
 
-    let mesh = create_mesh_node(MAP_SIZE / 32.0);
+    // let hm_handle = texture_buffer.0.clone();
+    let mesh = create_terrain_mesh_node();
     let mesh_handle = meshes.add(mesh);
     let cust_mat = ExtendedMaterial {
         base: StandardMaterial::default(),
         extension: CustomMaterial {
-            positions: buffer.0.clone(),
-            normals: normal_buffer.0.clone(),
+            heightmap: buffer.0.clone(),
             level: PatchState::new(0 as u32),
         },
     };
     let mat_handle = custom_materials.add(cust_mat);
+    println!("SPAWN {frame_id}");
     for patch in patches {
-        let scale = 2.0_f32.powf(patch.level as f32 + 1.0) - 0.02;
+        // let scale = 2.0_f32.powf(patch.level as f32 + 1.0) - 0.02;
         commands.spawn((
             Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(mat_handle.clone()),
-            Transform::from_xyz(patch.center.x, 10.0, patch.center.y)
-                .with_scale(Vec3::new(scale, 1.0, scale)),
-            PatchLabel,
+            Transform::from_xyz(patch.center.x, 0.0, patch.center.y),
+            // .with_scale(Vec3::new(scale, 1.0, scale)),
+            PatchLabel(frame_id),
         ));
     }
 }

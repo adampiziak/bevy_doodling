@@ -22,12 +22,16 @@
 }
 
 
-@group(2) @binding(100) var<storage, read> data: array<vec4f>;
-@group(2) @binding(101) var<storage, read> normals: array<vec4f>;
+@group(2) @binding(100) var<storage, read> data: array<f32>;
+// @group(2) @binding(101) var<storage, read> normals: array<vec4f>;
+// @group(0) @binding(100) var texture: texture_storage_2d<r32float, read>;
 struct PatchState {
     level: u32,
 }
-@group(0) @binding(102) var<uniform> patch_state: PatchState;
+// @group(2) @binding(100) var tex: texture_2d<f32>;
+// @group(2) @binding(101) var tex_sampler: sampler;
+
+@group(2) @binding(101) var<uniform> patch_state: PatchState;
 
 
 // struct Vertex {
@@ -72,7 +76,15 @@ struct Vertex {
 @vertex
 fn vertex(vertex_in: Vertex) -> VertexOutput {
     var vertex = vertex_in;
-    vertex.position[1] = data[(vertex.index) % 4][1];
+    let map_width = 600;
+    let map_height = 600u;
+    let x = u32(vertex.position[0]);
+    let z = u32(vertex.position[2]);
+    let i = z*map_height + x;
+    let height: f32 = data[i];
+
+    // let a: f32 = textureLoad(texure, vec2u(x, z)).x;
+    vertex.position[1] = height;
     // vertex.normal[1] = normals[vertex.index][1];
     var out: VertexOutput;
 
