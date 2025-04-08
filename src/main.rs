@@ -61,8 +61,9 @@ fn main() {
             },
             MaterialPlugin::<ExtendedMaterial<StandardMaterial, CustomMaterial>>::default(),
             GpuReadbackPlugin,
-            ExtractResourcePlugin::<ReadbackBuffer>::default(),
+            ExtractResourcePlugin::<HeightBuffer>::default(),
             ExtractResourcePlugin::<NormalBuffer>::default(),
+            ExtractResourcePlugin::<TangentBuffer>::default(),
             ExtractResourcePlugin::<HeightMapTexture>::default(),
             // ExtractResourcePlugin::<ReadbackImage>::default(),
             ExtractResourcePlugin::<TerrainState>::default(),
@@ -206,9 +207,11 @@ impl render_graph::Node for ComputeNode {
 }
 
 #[derive(Resource, ExtractResource, Clone)]
-struct ReadbackBuffer(Handle<ShaderStorageBuffer>);
+struct HeightBuffer(Handle<ShaderStorageBuffer>);
 #[derive(Resource, ExtractResource, Clone)]
 struct NormalBuffer(Handle<ShaderStorageBuffer>);
+#[derive(Resource, ExtractResource, Clone)]
+struct TangentBuffer(Handle<ShaderStorageBuffer>);
 #[derive(Resource, ExtractResource, Clone)]
 struct HeightMapTexture(Handle<Image>);
 
@@ -216,20 +219,25 @@ fn prepare_bind_group(
     mut commands: Commands,
     pipeline: Res<ComputePipeline>,
     render_device: Res<RenderDevice>,
-    buffer: Res<ReadbackBuffer>,
-    // normal_buffer: Res<NormalBuffer>,
+    buffer: Res<HeightBuffer>,
+    normal_buffer: Res<NormalBuffer>,
+    tangent_buffer: Res<TangentBuffer>,
     buffers: Res<RenderAssets<GpuShaderStorageBuffer>>,
     // image: Res<HeightMapTexture>,
     // images: Res<RenderAssets<GpuImage>>,
 ) {
     let buffer = buffers.get(&buffer.0).unwrap();
-    // let normal_buffer = buffers.get(&normal_buffer.0).unwrap();
-    // let image = images.get(&image.0).unwrap();
+    let tangent_buffer = buffers.get(&tangent_buffer.0).unwrap();
+    let normal_buffer = buffers.get(&normal_buffer.0).unwrap();
 
     let bind_group = render_device.create_bind_group(
         None,
         &pipeline.layout,
-        &BindGroupEntries::single(buffer.buffer.as_entire_buffer_binding()),
+        &BindGroupEntries::sequential((
+            buffer.buffer.as_entire_buffer_binding(),
+            normal_buffer.buffer.as_entire_buffer_binding(),
+            tangent_buffer.buffer.as_entire_buffer_binding(),
+        )),
     );
     commands.insert_resource(GpuBufferBindGroup(bind_group));
 }
@@ -247,7 +255,7 @@ fn update_mesh(
     mut commands: Commands,
     // storage_assets: Res<Assets<ShaderStorageBuffer>>,
     mut terrain_state: ResMut<TerrainState>,
-    buffer: Res<ReadbackBuffer>,
+    buffer: Res<HeightBuffer>,
     query: Query<Entity, With<Person>>, // buffers: Res<RenderAssets<GpuShaderStorageBuffer>>,
 ) {
     let count = query.iter().len();
@@ -295,9 +303,13 @@ impl FromWorld for ComputePipeline {
         // let terrain_state = world.resource::<TerrainState>();
         let layout = render_device.create_bind_group_layout(
             None,
-            &BindGroupLayoutEntries::single(
+            &BindGroupLayoutEntries::sequential(
                 ShaderStages::COMPUTE,
-                storage_buffer::<Vec<f32>>(false),
+                (
+                    storage_buffer::<Vec<f32>>(false),
+                    storage_buffer::<Vec<[f32; 4]>>(false),
+                    storage_buffer::<Vec<[f32; 4]>>(false),
+                ),
             ),
         );
         let shader = world.load_asset(COMPUTE_SHADER_ASSET_PATH);
@@ -361,6 +373,10 @@ struct CustomMaterial {
     #[texture(108)]
     #[sampler(109)]
     pub mountain_normals: Option<Handle<Image>>,
+    #[storage(110, read_only)]
+    normals: Handle<ShaderStorageBuffer>,
+    #[storage(111, read_only)]
+    tangents: Handle<ShaderStorageBuffer>,
 }
 impl MaterialExtension for CustomMaterial {
     fn vertex_shader() -> ShaderRef {
@@ -435,99 +451,22 @@ fn setup(
     mut buffers: ResMut<Assets<ShaderStorageBuffer>>,
     mut custom_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CustomMaterial>>>,
 ) {
-    // Terrain state
-    // commands.init_resource::<TerrainState>();
-
-    let mesh_width = 20.0;
-
-    let mesh_plane = PlaneMeshBuilder::new(
-        Dir3::new(Vec3::new(0.0, 1.0, 0.0)).unwrap(),
-        Vec2::new(MAP_WIDTH as f32, MAP_HEIGHT as f32),
-    )
-    .build();
-    // commands.spawn((
-    //     Mesh3d(meshes.add(mesh_plane)),
-    //     MeshMaterial3d(materials.add(Color::WHITE)),
-    //     Transform::from_xyz(0.0, -1.0, 0.0),
-    //     Terrain,
-    // ));
-
-    // let terrain_mesh = create_terrain_mesh();
-
-    // let mut cust_mat = None;
-    // if let Some(vals) = get_mesh_positions(&mesh_plane) {
-    //     // terrain_state.buffer_size = vals.len();
-    //     // let uarray: Vec<[f32; 4]> = vals.into_iter().map(|p| [p[0], p[1], p[2], 1.0]).collect();
-    //     // let
-    //     // let ulen = uarray.len();
-    //     let terrain_heightmap
-    //     let mut buffer = ShaderStorageBuffer::from(uarray);
-    //     let mut normal_buffer = ShaderStorageBuffer::from(vec![[0.0, 1.0, 0.0, 1.0]; ulen]);
-    //     buffer.buffer_description.usage |= BufferUsages::COPY_SRC;
-    //     normal_buffer.buffer_description.usage |= BufferUsages::COPY_SRC;
-    //     let buffer = buffers.add(buffer);
-    //     let normal_buffer = buffers.add(normal_buffer);
-    //     cust_mat = Some(ExtendedMaterial {
-    //         base: StandardMaterial::default(),
-    //         extension: CustomMaterial {
-    //             positions: buffer.clone(),
-    //             normals: normal_buffer.clone(),
-    //             level: PatchState::new(5),
-    //         },
-    //     });
-    //     commands.insert_resource(ReadbackBuffer(buffer));
-    //     commands.insert_resource(NormalBuffer(normal_buffer));
-    // } else {
-    //     panic!("CANNOT EXTRACT VALS");
-    // }
-    // let Some(mat) = cust_mat else {
-    //     panic!("NO MATERIAL");
-    // };
-    // let mat_handle = custom_materials.add(mat);
-    // let heightmap_texture_size = Extent3d {
-    //     width: MAP_WIDTH as u32,
-    //     height: MAP_HEIGHT as u32,
-    //     ..Default::default()
-    // };
-    // let mut heightmap_texture = Image::new_uninit(
-    //     heightmap_texture_size,
-    //     TextureDimension::D2,
-    //     TextureFormat::R32Float,
-    //     RenderAssetUsages::RENDER_WORLD,
-    // );
-    // heightmap_texture.texture_descriptor.usage |=
-    //     TextureUsages::COPY_SRC | TextureUsages::STORAGE_BINDING;
-    // let image = images.add(heightmap_texture);
-    let mut terrain_state = TerrainState::default();
-    let heightmap_buffer = vec![0.0; MAP_HEIGHT * MAP_WIDTH];
-    // let mut normal_buffer =
-    //     ShaderStorageBuffer::from(vec![[0.0, 1.0, 0.0, 1.0]; heightmap_buffer.len()]);
-    let mut buffer = ShaderStorageBuffer::from(heightmap_buffer);
+    let terrain_state = TerrainState::default();
+    let vertex_count = MAP_HEIGHT * MAP_WIDTH;
+    let heightmap_buffer = vec![0.0; vertex_count];
+    let normal_buffer = vec![[0.0; 4]; vertex_count];
+    let tangent_buffer = vec![[0.0; 4]; vertex_count];
+    let buffer = ShaderStorageBuffer::from(heightmap_buffer);
+    let normal_buffer = ShaderStorageBuffer::from(normal_buffer);
+    let tangent_buffer = ShaderStorageBuffer::from(tangent_buffer);
     let buffer = buffers.add(buffer);
-    // terrain_state.buffer_size = MAP_HEIGHT * MAP_WIDTH;
-    // buffer.buffer_description.usage |= BufferUsages::COPY_SRC;
-    // normal_buffer.buffer_description.usage |= BufferUsages::COPY_SRC;
+    let normal_buffer = buffers.add(normal_buffer);
+    let tangent_buffer = buffers.add(tangent_buffer);
+
     commands.insert_resource(terrain_state);
-    commands.insert_resource(ReadbackBuffer(buffer));
-    // commands.insert_resource(HeightMapTexture(image));
-
-    // let mat = CustomMaterial {positions: }
-
-    // let terrain_mesh = create_terrain_mesh();
-
-    // let chunks = 0;
-    // let chunk_sep = mesh_width + 5.0;
-
-    // for x in 0..chunks {
-    //     for y in 0..chunks {
-    //         commands.spawn((
-    //             Mesh3d(meshes.add(mesh_plane.clone())),
-    //             MeshMaterial3d(mat_handle.clone()),
-    //             Transform::from_xyz(x as f32 * chunk_sep, 0.0, y as f32 * chunk_sep),
-    //             Terrain,
-    //         ));
-    //     }
-    // }
+    commands.insert_resource(HeightBuffer(buffer));
+    commands.insert_resource(NormalBuffer(normal_buffer));
+    commands.insert_resource(TangentBuffer(tangent_buffer));
 }
 
 #[derive(Component)]

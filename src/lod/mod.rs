@@ -16,8 +16,9 @@ use kdtree::KdTree;
 use rand::{Rng, rng};
 
 use crate::{
-    CustomMaterial, EventTimer, HeightMapTexture, MAP_WIDTH, NormalBuffer, PatchState,
-    RANGE_MIN_DIS, ReadbackBuffer, TREE_DEPTH, coord2index, get_mesh_positions, index2coord,
+    CustomMaterial, EventTimer, HeightBuffer, HeightMapTexture, MAP_WIDTH, NormalBuffer,
+    PatchState, RANGE_MIN_DIS, TREE_DEPTH, TangentBuffer, coord2index, get_mesh_positions,
+    index2coord,
 };
 
 struct MeshNode {
@@ -168,8 +169,9 @@ pub fn render_lod(
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
 
-    buffer: Res<ReadbackBuffer>,
-    // normal_buffer: Res<NormalBuffer>,
+    buffer: Res<HeightBuffer>,
+    normal_buffer: Res<NormalBuffer>,
+    tangent_buffer: Res<TangentBuffer>,
     // texture_buffer: Res<HeightMapTexture>,
     mesh_query: Query<(Entity, &PatchLabel)>,
     time: Res<Time>,
@@ -240,6 +242,8 @@ pub fn render_lod(
             base: StandardMaterial::default(),
             extension: CustomMaterial {
                 heightmap: buffer.0.clone(),
+                normals: normal_buffer.0.clone(),
+                tangents: tangent_buffer.0.clone(),
                 level: PatchState::new(pl as u32, patch.center.x, patch.center.y),
                 color_texture: Some(asset_server.load_with_settings(
                     // "textures/grass01.png",

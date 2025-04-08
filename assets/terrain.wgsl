@@ -23,7 +23,8 @@
 
 
 @group(2) @binding(100) var<storage, read> data: array<f32>;
-// @group(2) @binding(101) var<storage, read> normals: array<vec4f>;
+@group(2) @binding(110) var<storage, read> normals: array<vec4f>;
+@group(2) @binding(111) var<storage, read> tangents: array<vec4f>;
 // @group(0) @binding(100) var texture: texture_storage_2d<r32float, read>;
 struct PatchState {
     level: u32,
@@ -106,6 +107,9 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let i = u32(600.0*min(round(zi - 0.0), 599.0) + min(round(xi - 0.0), 599.0));
     let height: f32 = data[i];
 
+    let computed_normal = normals[i];
+    let computed_tangent = tangents[i];
+
     
     vertex.position = vec3f(x, height, z);
     var out: VertexOutput;
@@ -116,7 +120,8 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
 #ifdef VERTEX_NORMALS
     out.world_normal = mesh_functions::mesh_normal_local_to_world(
-        vertex.normal,
+        // vertex.normal,
+        computed_normal.xyz,
         vertex.instance_index
     );
 #endif
@@ -136,7 +141,8 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 #ifdef VERTEX_TANGENTS
     out.world_tangent = mesh_functions::mesh_tangent_local_to_world(
         world_from_local,
-        vertex.tangent,
+        // vertex.tangent,
+        computed_tangent,
         // Use vertex_no_morph.instance_index instead of vertex.instance_index to work around a wgpu dx12 bug.
         // See https://github.com/gfx-rs/naga/issues/2416
         vertex.instance_index
@@ -203,7 +209,7 @@ fn fragment(
     // apply in-shader post processing (fog, alpha-premultiply, and also tonemapping, debanding if the camera is non-hdr)
     // note this does not include fullscreen postprocessing effects like bloom.
     out.color = main_pass_post_lighting_processing(pbr_input, out.color);
-    // out.color[2] = 1.0;
+    // out.color = vec4(in.world_normal * 0.5 + 0.5, 1.0);
     return out;
 
 }

@@ -1,5 +1,6 @@
 @group(0) @binding(0) var<storage, read_write> data: array<f32>;
-// @group(0) @binding(1) var<storage, read_write> normals: array<vec4f>;
+@group(0) @binding(1) var<storage, read_write> normals: array<vec4f>;
+@group(0) @binding(2) var<storage, read_write> tangents: array<vec4f>;
 // @group(0) @binding(0) var texture: texture_storage_2d<r32float, read_write>;
 
 @compute @workgroup_size(8, 1, 8)
@@ -7,14 +8,45 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let map_height = 600u;
     let x = global_id.x;
     let z = global_id.z;
-    // let i = (z-1u)*map_height + x - 1u;
     let i = (z)*map_height + x;
     let pscale = 133.3;
-    // let pz = 24.2;
-    data[i] += perlinNoise2(vec2f(f32(x)/pscale, f32(z)/pscale))/5.0;;
-        // data[i] += 0.000001*f32(600u - x)*f32(600u - z);
-    // normals[i][1] -= data[i][1]/100.0;
+    let perlin_x = f32(x)/pscale;
+    let perlin_z = f32(z)/pscale;
+    let perlin_pt = vec2f(perlin_x, perlin_z);
+    let texel_size = vec2f(0.2, 0.2);
+    data[i] += perlinNoise2(vec2f(perlin_x, perlin_z))/5.0;;
+    let normal = compute_normal(perlin_pt, texel_size);
+    let tangent = compute_tangent(normal);
+    normals[i] = vec4f(normal, 1.0);
+    tangents[i] = vec4f(tangent, 1.0);
 }
+
+fn compute_normal(point: vec2f, texel_size: vec2f) -> vec3f {
+    let left = point - vec2(texel_size.x, 0.0);
+    let right = point + vec2(texel_size.x, 0.0);
+    let down = point - vec2(0.0, texel_size.y);
+    let up = point + vec2(0.0, texel_size.y);
+    let hL = perlinNoise2(left);
+    let hR = perlinNoise2(right);
+    let hD = perlinNoise2(down);
+    let hU = perlinNoise2(up);
+
+    let dx = hL - hR;
+    let dy = hD - hU;
+
+    let normal = normalize(vec3(dx, 2.0, dy));
+    return normal;
+}
+
+fn compute_tangent(normal: vec3<f32>) -> vec3<f32> {
+    var up = vec3(0.0, 1.0, 0.0);
+    if (abs(normal.y) > 0.999) {
+        up = vec3(0.0, 0.0, 1.0); // fallback if normal is too close to Z+
+    }
+    let tangent = normalize(cross(up, normal));
+    return tangent;
+}
+
 
 // MIT License. © Stefan Gustavson, Munrocket
 //
