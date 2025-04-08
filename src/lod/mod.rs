@@ -1,6 +1,9 @@
 use bevy::{
     asset::RenderAssetUsages,
-    color::palettes::{css::RED, tailwind::RED_500},
+    color::palettes::{
+        css::RED,
+        tailwind::{INDIGO_600, RED_500},
+    },
     ecs::{component::Component, system::Commands},
     image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
     math::{
@@ -389,7 +392,7 @@ pub fn setup_mock_camera(
     let cscale = 10.0;
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::default())),
-        MeshMaterial3d(materials.add(Color::from(RED_500))),
+        MeshMaterial3d(materials.add(Color::from(INDIGO_600))),
         Transform::from_xyz(0.0, 10.0, 0.0).with_scale(Vec3::new(cscale, cscale, cscale)),
         MockCamera,
     ));
