@@ -172,16 +172,16 @@ fn fragment(
     in: VertexOutput,
     @builtin(front_facing) is_front: bool,
 ) -> FragmentOutput {
-    let mountain_f= 50.0;
-    let grass_f = 40.0;
+    let mountain_f= 100.0;
+    let grass_f = 70.0;
     var grass = textureSample(material_color_texture, material_color_sampler, in.uv/grass_f );
     var grass_norms = textureSample(material_color_texture_normal, material_color_sampler_normal, in.uv/grass_f );
     var mountain = textureSample(material_color_texture2, material_color_sampler2, in.uv/mountain_f );
     var mountain_norms = textureSample(mountain_normals, mountain_normals_sampler, in.uv/mountain_f );
     var h = max(in.world_position[1] + 0.5, 0.1);
-    var f = 1.0/(1.0 + h*h*h*h/32.0);
+    var f = 1.0/(1.0 + h/32.0);
     var new_in = in;
-    // new_in.world_normal += mix(mountain_norms.xyz, grass_norms.xyz, f)*0.05;
+    new_in.world_normal += mix(mountain_norms.xyz, grass_norms.xyz*0.5, f);
 
     
     var basecol = 1.0;

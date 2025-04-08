@@ -586,7 +586,7 @@ fn setup_camera(mut commands: Commands) {
     // ));
     commands.spawn((
         DirectionalLight {
-            illuminance: 8_000.0,
+            illuminance: 6_000.0,
 
             shadows_enabled: true,
             ..default()
@@ -594,7 +594,7 @@ fn setup_camera(mut commands: Commands) {
         Transform::from_xyz(0.0, 300.0, 0.0).looking_to(
             Vec3 {
                 x: -0.2,
-                y: -0.16,
+                y: -0.12,
                 z: 0.2,
             },
             Vec3::Y,

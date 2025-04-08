@@ -239,7 +239,10 @@ pub fn render_lod(
     for patch in patches {
         let pl = (TREE_DEPTH as i32 - patch.level as i32).max(0);
         let cust_mat = ExtendedMaterial {
-            base: StandardMaterial::default(),
+            base: StandardMaterial {
+                perceptual_roughness: 0.8,
+                ..Default::default()
+            },
             extension: CustomMaterial {
                 heightmap: buffer.0.clone(),
                 normals: normal_buffer.0.clone(),
