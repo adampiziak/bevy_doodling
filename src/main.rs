@@ -68,6 +68,7 @@ fn main() {
             ExtractResourcePlugin::<TerrainState>::default(),
         ))
         .insert_resource(EventTimer {
+            // field1: Timer::from_seconds(1.0, TimerMode::Repeating),
             field1: Timer::from_seconds(0.05, TimerMode::Repeating),
         })
         .add_systems(Startup, setup)
@@ -113,7 +114,10 @@ fn compute_on_input(
     query: Query<Option<&Readback>>,
 ) {
     // println!("TERRAIN STATE IS {:?}", terrain_state.stage);
-    if input.pressed(KeyCode::KeyJ) && terrain_state.stage == TerrainStage::Idle {
+    // if input.pressed(KeyCode::KeyJ) && terrain_state.stage == TerrainStage::Idle {
+    //     terrain_state.stage = TerrainStage::Start;
+    // }
+    if terrain_state.stage == TerrainStage::Idle {
         terrain_state.stage = TerrainStage::Start;
     }
     // if terrain_state.stage == TerrainStage::Idle {
@@ -345,6 +349,18 @@ struct CustomMaterial {
     heightmap: Handle<ShaderStorageBuffer>,
     #[uniform(101)]
     level: PatchState,
+    #[texture(102)]
+    #[sampler(103)]
+    pub color_texture: Option<Handle<Image>>,
+    #[texture(104)]
+    #[sampler(105)]
+    pub color2_texture: Option<Handle<Image>>,
+    #[texture(106)]
+    #[sampler(107)]
+    pub mountain_texture: Option<Handle<Image>>,
+    #[texture(108)]
+    #[sampler(109)]
+    pub mountain_normals: Option<Handle<Image>>,
 }
 impl MaterialExtension for CustomMaterial {
     fn vertex_shader() -> ShaderRef {
@@ -359,7 +375,7 @@ impl MaterialExtension for CustomMaterial {
     }
 }
 const TREE_DEPTH: usize = 5;
-const RANGE_MIN_DIS: f32 = 100.0;
+const RANGE_MIN_DIS: f32 = 30.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
 
@@ -620,18 +636,18 @@ fn setup_camera(mut commands: Commands) {
                 ),
             ));
         });
-    commands.spawn((
-        PointLight {
-            intensity: 1000000.0,
-            color: BLUE.into(),
-            range: 100.0,
-            ..Default::default()
-        },
-        Transform::from_xyz(0.0, 2.5, 0.0),
-    ));
+    // commands.spawn((
+    //     PointLight {
+    //         intensity: 1000000.0,
+    //         color: BLUE.into(),
+    //         range: 100.0,
+    //         ..Default::default()
+    //     },
+    //     Transform::from_xyz(0.0, 2.5, 0.0),
+    // ));
     commands.spawn((
         DirectionalLight {
-            illuminance: 8000.0,
+            illuminance: 8_000.0,
 
             shadows_enabled: true,
             ..default()
@@ -645,4 +661,21 @@ fn setup_camera(mut commands: Commands) {
             Vec3::Y,
         ),
     ));
+
+    // commands.spawn((
+    //     DirectionalLight {
+    //         illuminance: 16000.0,
+
+    //         shadows_enabled: true,
+    //         ..default()
+    //     },
+    //     Transform::from_xyz(0.0, 30.0, 0.0).looking_to(
+    //         Vec3 {
+    //             x: -0.2,
+    //             y: -0.16,
+    //             z: 0.2,
+    //         },
+    //         Vec3::Y,
+    //     ),
+    // ));
 }

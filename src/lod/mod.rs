@@ -2,6 +2,7 @@ use bevy::{
     asset::RenderAssetUsages,
     color::palettes::{css::RED, tailwind::RED_500},
     ecs::{component::Component, system::Commands},
+    image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
     math::{
         Dir3, Vec2, Vec3,
         bounding::{Aabb3d, BoundingSphere, IntersectsVolume},
@@ -93,6 +94,7 @@ fn create_terrain_mesh_node(level: usize) -> Mesh {
     let node_height = PATCH_HEIGHT;
     let node_width = node_height;
     let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; node_width * node_height];
+    let mut uvs: Vec<[f32; 2]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
     let side_length =
         MAP_WIDTH as f32 / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32) / (node_width - 1) as f32;
@@ -100,7 +102,10 @@ fn create_terrain_mesh_node(level: usize) -> Mesh {
     // let mut rng = rng();
     for i in 0..node_width * node_height {
         let (x, z) = patch_index2coord(i);
+        let xoffset = x as f32 * side_length;
+        let zoffset = z as f32 * side_length;
         positions[i as usize] = [x as f32 * side_length, 5.0, z as f32 * side_length];
+        uvs.push([xoffset, zoffset]);
     }
 
     // create triangles
@@ -119,7 +124,7 @@ fn create_terrain_mesh_node(level: usize) -> Mesh {
             let mut triangle1 = vec![top_left, bottom_left, bottom_right];
             // triangle1.reverse();
             let mut triangle2 = vec![top_left, bottom_right, top_right];
-            triangle2.reverse();
+            // triangle2.reverse();
             indices.append(&mut triangle1);
             indices.append(&mut triangle2);
         }
@@ -128,7 +133,10 @@ fn create_terrain_mesh_node(level: usize) -> Mesh {
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
 
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
     mesh.insert_indices(Indices::U32(indices));
+    mesh.compute_normals();
+    mesh.generate_tangents().unwrap();
 
     mesh
 }
@@ -158,6 +166,8 @@ pub fn render_lod(
     mut commands: Commands,
     mock_camera: Query<&Transform, With<MockCamera>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
+
     buffer: Res<ReadbackBuffer>,
     // normal_buffer: Res<NormalBuffer>,
     // texture_buffer: Res<HeightMapTexture>,
@@ -179,7 +189,7 @@ pub fn render_lod(
     let frame_id = rng.random_range(0_32..1000000);
     for (entity, label) in mesh_query.iter() {
         if label.0 != frame_id {
-            println!("DESPAWN {}", label.0);
+            // println!("DESPAWN {}", label.0);
             commands.entity(entity).despawn();
         }
     }
@@ -212,7 +222,7 @@ pub fn render_lod(
     select_lod(&node, &mut patches, TREE_DEPTH - 1, &bounding_spheres);
 
     // remove previous patches
-    println!("NUM PATCHES: {}", patches.len());
+    // println!("NUM PATCHES: {}", patches.len());
 
     let mut patch_meshes = Vec::new();
 
@@ -223,7 +233,7 @@ pub fn render_lod(
     }
 
     // let hm_handle = texture_buffer.0.clone();
-    println!("SPAWN {frame_id}");
+    // println!("SPAWN {frame_id}");
     for patch in patches {
         let pl = (TREE_DEPTH as i32 - patch.level as i32).max(0);
         let cust_mat = ExtendedMaterial {
@@ -231,13 +241,71 @@ pub fn render_lod(
             extension: CustomMaterial {
                 heightmap: buffer.0.clone(),
                 level: PatchState::new(pl as u32, patch.center.x, patch.center.y),
+                color_texture: Some(asset_server.load_with_settings(
+                    // "textures/grass01.png",
+                    "textures/ground2.png",
+                    |s: &mut _| {
+                        *s = ImageLoaderSettings {
+                            sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {
+                                // rewriting mode to repeat image,
+                                address_mode_u: ImageAddressMode::Repeat,
+                                address_mode_v: ImageAddressMode::Repeat,
+                                ..default()
+                            }),
+                            ..default()
+                        }
+                    },
+                )),
+                color2_texture: Some(asset_server.load_with_settings(
+                    // "textures/grass01.png",
+                    "textures/ground2_normal.png",
+                    |s: &mut _| {
+                        *s = ImageLoaderSettings {
+                            sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {
+                                // rewriting mode to repeat image,
+                                address_mode_u: ImageAddressMode::Repeat,
+                                address_mode_v: ImageAddressMode::Repeat,
+                                ..default()
+                            }),
+                            ..default()
+                        }
+                    },
+                )),
+                mountain_texture: Some(asset_server.load_with_settings(
+                    "textures/mountain.png",
+                    |s: &mut _| {
+                        *s = ImageLoaderSettings {
+                            sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {
+                                // rewriting mode to repeat image,
+                                address_mode_u: ImageAddressMode::Repeat,
+                                address_mode_v: ImageAddressMode::Repeat,
+                                ..default()
+                            }),
+                            ..default()
+                        }
+                    },
+                )),
+                mountain_normals: Some(asset_server.load_with_settings(
+                    "textures/mountain_normals.png",
+                    |s: &mut _| {
+                        *s = ImageLoaderSettings {
+                            sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {
+                                // rewriting mode to repeat image,
+                                address_mode_u: ImageAddressMode::Repeat,
+                                address_mode_v: ImageAddressMode::Repeat,
+                                ..default()
+                            }),
+                            ..default()
+                        }
+                    },
+                )),
             },
         };
         let w = MAP_WIDTH as f32 / 2.0_f32.powf((TREE_DEPTH - patch.level - 1) as f32);
-        println!(
-            "PATCH LEVEL {}, CENTER {}, width: {w}",
-            patch.level, patch.center
-        );
+        // println!(
+        //     "PATCH LEVEL {}, CENTER {}, width: {w}",
+        //     patch.level, patch.center
+        // );
         let mat_handle = custom_materials.add(cust_mat);
         // let scale = 2.0_f32.powf(patch.level as f32 + 1.0) - 1.0;
         // let scale = 0.86 / 2.1 * (2.0_f32.powf(patch.level as f32));

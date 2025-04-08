@@ -34,6 +34,15 @@ struct PatchState {
 // @group(2) @binding(101) var tex_sampler: sampler;
 
 @group(2) @binding(101) var<uniform> patch_state: PatchState;
+@group(2) @binding(102) var material_color_texture: texture_2d<f32>;
+@group(2) @binding(103) var material_color_sampler: sampler;
+@group(2) @binding(104) var material_color_texture_normal: texture_2d<f32>;
+@group(2) @binding(105) var material_color_sampler_normal: sampler;
+@group(2) @binding(106) var material_color_texture2: texture_2d<f32>;
+@group(2) @binding(107) var material_color_sampler2: sampler;
+@group(2) @binding(108) var mountain_normals: texture_2d<f32>;
+@group(2) @binding(109) var mountain_normals_sampler: sampler;
+
 
 
 // struct Vertex {
@@ -118,7 +127,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 #endif
 
 #ifdef VERTEX_UVS_A
-    out.uv = vertex.uv;
+    out.uv = vertex.uv + vec2f(x, z);
 #endif
 #ifdef VERTEX_UVS_B
     out.uv_b = vertex.uv_b;
@@ -157,7 +166,31 @@ fn fragment(
     in: VertexOutput,
     @builtin(front_facing) is_front: bool,
 ) -> FragmentOutput {
-       var pbr_input = pbr_input_from_standard_material(in, is_front);
+    let mountain_f= 50.0;
+    let grass_f = 40.0;
+    var grass = textureSample(material_color_texture, material_color_sampler, in.uv/grass_f );
+    var grass_norms = textureSample(material_color_texture_normal, material_color_sampler_normal, in.uv/grass_f );
+    var mountain = textureSample(material_color_texture2, material_color_sampler2, in.uv/mountain_f );
+    var mountain_norms = textureSample(mountain_normals, mountain_normals_sampler, in.uv/mountain_f );
+    var h = max(in.world_position[1] + 0.5, 0.1);
+    var f = 1.0/(1.0 + h*h*h*h/32.0);
+    var new_in = in;
+    // new_in.world_normal += mix(mountain_norms.xyz, grass_norms.xyz, f)*0.05;
+
+    
+    var basecol = 1.0;
+    var basecolvec = vec4f(basecol, basecol, basecol, 1.0);
+    grass -= 0.13;
+    mountain -= 0.1;
+
+
+    var pbr_input = pbr_input_from_standard_material(new_in, is_front);
+    pbr_input.material.base_color = mix(mountain, grass, f);
+
+    // pbr_input.material.base_color = basecolvec;
+    // pbr_input.material.base_color = mountain;
+
+
 
     var out: FragmentOutput;
     out.color = apply_pbr_lighting(pbr_input);
@@ -170,7 +203,7 @@ fn fragment(
     // apply in-shader post processing (fog, alpha-premultiply, and also tonemapping, debanding if the camera is non-hdr)
     // note this does not include fullscreen postprocessing effects like bloom.
     out.color = main_pass_post_lighting_processing(pbr_input, out.color);
-    out.color[2] = 1.0;
+    // out.color[2] = 1.0;
     return out;
 
 }
