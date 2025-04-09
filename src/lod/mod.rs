@@ -13,7 +13,10 @@ use bevy::{
     },
     pbr::ExtendedMaterial,
     prelude::*,
-    render::mesh::{Indices, Mesh, Mesh3d, MeshBuilder, PlaneMeshBuilder, PrimitiveTopology},
+    render::{
+        mesh::{Indices, Mesh, Mesh3d, MeshBuilder, PlaneMeshBuilder, PrimitiveTopology},
+        view::NoFrustumCulling,
+    },
 };
 use kdtree::KdTree;
 use rand::{Rng, rng};
@@ -82,7 +85,7 @@ impl MeshNode {
 //         .build();
 //     mesh
 const PATCH_WIDTH: usize = 40;
-const PATCH_HEIGHT: usize = 10;
+const PATCH_HEIGHT: usize = 20;
 fn patch_coord2index(x: usize, z: usize) -> usize {
     z * PATCH_HEIGHT + x
 }
@@ -108,7 +111,7 @@ fn create_terrain_mesh_node(level: usize) -> Mesh {
         let (x, z) = patch_index2coord(i);
         let xoffset = x as f32 * side_length;
         let zoffset = z as f32 * side_length;
-        positions[i as usize] = [x as f32 * side_length, 5.0, z as f32 * side_length];
+        positions[i as usize] = [xoffset, 5.0, zoffset];
         uvs.push([xoffset, zoffset]);
     }
 
@@ -324,6 +327,7 @@ pub fn render_lod(
         commands.spawn((
             Mesh3d(mesh_handle),
             MeshMaterial3d(mat_handle.clone()),
+            NoFrustumCulling,
             // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
             PatchLabel(frame_id),
         ));

@@ -390,8 +390,8 @@ impl MaterialExtension for CustomMaterial {
         TERRAIN_SHADER_PATH.into()
     }
 }
-const TREE_DEPTH: usize = 6;
-const RANGE_MIN_DIS: f32 = 30.0;
+const TREE_DEPTH: usize = 5;
+const RANGE_MIN_DIS: f32 = 20.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
 

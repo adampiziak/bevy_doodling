@@ -132,7 +132,8 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 #endif
 
 #ifdef VERTEX_UVS_A
-    out.uv = vertex.uv + vec2f(x, z);
+    out.uv = vec2f(x, z);
+    // out.uv = vertex.uv;
 #endif
 #ifdef VERTEX_UVS_B
     out.uv_b = vertex.uv_b;
@@ -172,8 +173,8 @@ fn fragment(
     in: VertexOutput,
     @builtin(front_facing) is_front: bool,
 ) -> FragmentOutput {
-    let mountain_f= 100.0;
-    let grass_f = 70.0;
+    let mountain_f= 50.0;
+    let grass_f = 100.0;
     var grass = textureSample(material_color_texture, material_color_sampler, in.uv/grass_f );
     var grass_norms = textureSample(material_color_texture_normal, material_color_sampler_normal, in.uv/grass_f );
     var mountain = textureSample(material_color_texture2, material_color_sampler2, in.uv/mountain_f );
