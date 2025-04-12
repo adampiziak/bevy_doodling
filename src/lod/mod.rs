@@ -352,10 +352,11 @@ pub fn render_lod(
     let partial_mesh_handle = meshes.add(partial_patch_mesh);
     for patch in patches2 {
         let mut side_length = get_side_length(patch.level);
+        let mut patch_size = side_length * (2 * PARTIAL_PATCH_SIZE - 1) as f32;
         if patch.partial {
             side_length = 0.0;
+            patch_size = 0.0;
         }
-        let patch_size = side_length * (PARTIAL_PATCH_SIZE - 1) as f32;
         gizmos.sphere(patch.boundry.min, 1.0, colors[patch.level]);
         let patch_state = PatchState::new(
             // pl as u32,
