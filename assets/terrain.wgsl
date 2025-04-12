@@ -26,10 +26,14 @@
 @group(2) @binding(110) var<storage, read> normals: array<vec4f>;
 @group(2) @binding(111) var<storage, read> tangents: array<vec4f>;
 // @group(0) @binding(100) var texture: texture_storage_2d<r32float, read>;
+
 struct PatchState {
     level: u32,
     offset_x: f32,
     offset_y: f32,
+    camera_pos: vec4f,
+    ranges: array<vec4f, 16>,
+    tree_depth: u32
 }
 // @group(2) @binding(100) var tex: texture_2d<f32>;
 // @group(2) @binding(101) var tex_sampler: sampler;
@@ -151,7 +155,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 #endif
 
 #ifdef VERTEX_COLORS
-    out.color = vertex.color*patch_state.level;
+    out.color = vertex.color;
 #endif
 
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX

@@ -15,6 +15,7 @@ use bevy::{
     prelude::*,
     render::{
         mesh::{Indices, Mesh, Mesh3d, MeshBuilder, PlaneMeshBuilder, PrimitiveTopology},
+        render_resource::ShaderType,
         view::NoFrustumCulling,
     },
 };
@@ -139,9 +140,11 @@ fn create_terrain_mesh_node(level: usize) -> Mesh {
 
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
 
+    let plen = positions.len();
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
     mesh.insert_indices(Indices::U32(indices));
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vec![[0.0; 4]; plen]);
     mesh.compute_normals();
     mesh.generate_tangents().unwrap();
 
@@ -210,9 +213,9 @@ pub fn render_lod(
 
     let mut bounding_spheres = Vec::new();
 
-    for r in ranges {
+    for r in &ranges {
         // let sphere = Sphere::new(r);
-        let bsphere = BoundingSphere::new(transform.translation, r);
+        let bsphere = BoundingSphere::new(transform.translation, *r);
         bounding_spheres.push(bsphere);
     }
 
@@ -243,8 +246,17 @@ pub fn render_lod(
 
     // let hm_handle = texture_buffer.0.clone();
     // println!("SPAWN {frame_id}");
+    PatchState::assert_uniform_compat();
     for patch in patches {
         let pl = (TREE_DEPTH as i32 - patch.level as i32).max(0);
+        let patch_state = PatchState::new(
+            pl as u32,
+            patch.center.x,
+            patch.center.y,
+            transform.translation.to_array(),
+            &ranges,
+            TREE_DEPTH as u32,
+        );
         let cust_mat = ExtendedMaterial {
             base: StandardMaterial {
                 perceptual_roughness: 0.8,
@@ -254,7 +266,7 @@ pub fn render_lod(
                 heightmap: buffer.0.clone(),
                 normals: normal_buffer.0.clone(),
                 tangents: tangent_buffer.0.clone(),
-                level: PatchState::new(pl as u32, patch.center.x, patch.center.y),
+                level: patch_state,
                 color_texture: Some(asset_server.load_with_settings(
                     // "textures/grass01.png",
                     "textures/ground2.png",
@@ -325,7 +337,7 @@ pub fn render_lod(
                 heightmap: buffer.0.clone(),
                 normals: normal_buffer.0.clone(),
                 tangents: tangent_buffer.0.clone(),
-                level: PatchState::new(pl as u32, patch.center.x, patch.center.y),
+                level: patch_state,
             },
         };
 

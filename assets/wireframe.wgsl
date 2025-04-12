@@ -29,6 +29,9 @@ struct PatchState {
     level: u32,
     offset_x: f32,
     offset_y: f32,
+    camera_pos: vec4f,
+    ranges: array<vec4f, 16>,
+    tree_depth: u32,
 }
 @group(2) @binding(101) var<uniform> patch_state: PatchState;
 struct Vertex {
@@ -125,7 +128,19 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 #endif
 
 #ifdef VERTEX_COLORS
-    out.color = vertex.color*patch_state.level;
+    // out.color = vertex.color;
+    let camera_pos = patch_state.camera_pos.xyz;
+    var vi = patch_state.tree_depth - patch_state.level;
+    // if vi > 0 {
+    //     vi -= 1;
+    // }
+    let range = patch_state.ranges[vi].x;
+    let next_range = patch_state.ranges[i + 1].x;
+    let rdis = next_range - range;
+    let dis = distance(camera_pos, vertex.position) - range;
+    let f = (1.0 - dis/rdis) - 0.8;
+
+    out.color = vec4f(0.0, f, 0.0, 1.0);
 #endif
 
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
@@ -148,8 +163,9 @@ fn fragment(
     @builtin(front_facing) is_front: bool,
 ) -> FragmentOutput {
     var out: FragmentOutput;
-    let c = 0.1;
+    let c = 0.0;
     out.color = vec4f(c, c, c, 1.0);
+    out.color = in.color;
     return out;
 
 }
