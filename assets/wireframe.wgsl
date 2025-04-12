@@ -76,14 +76,14 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     // let height = f32(patch_state.level)*5.0;
 
     // let a: f32 = textureLoad(texure, vec2u(x, z)).x;
-    let offset = 600.0 / pow(2.0, f32(patch_state.level));
+    let offset = 600.0 / pow(2.0, f32(patch_state.tree_depth - patch_state.level));
     let xi = vertex.position[0] + patch_state.offset_x - offset + 300.0;
     let zi = vertex.position[2] + patch_state.offset_y - offset + 300.0;
     let x = xi - 300.0;
     let z = zi - 300.0;
 
     let i = u32(600.0*min(round(zi - 0.0), 599.0) + min(round(xi - 0.0), 599.0));
-    let height: f32 = data[i] + 0.05;
+    let height: f32 = data[i] + 0.4;
 
     let computed_normal = normals[i];
     let computed_tangent = tangents[i];
@@ -102,15 +102,17 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let delta = high - low;
     let factor = (dis - low) / delta;
 
-    let morph_val = clamp(factor / 0.5 - 1.0, 0.0, 1.0);
-    let mesh_dim = vec2f(20.0, 20.0);
-    var mesh_pos = vpos.xz;
-    let frc: vec2f = fract(mesh_pos * patch_state.side_length * 0.5)*2.0/patch_state.side_length;
-    let mvertex = mesh_pos - frc*morph_val;
+    let morph_val = clamp(factor/0.5  - 1.0, 0.0, 1.0);
+    let frc: vec2f = fract(vertex.position.xz/patch_state.side_length * 0.5)*2.0;
+    var mvertex = vpos.xz;
+    // var mval = vec2f(0.0, 0.0);
+    let    mval = frc*morph_val*patch_state.side_length;
+        mvertex -= mval;
     // mesh_pos = mesh_pos - pos_fraction * morph_val;
 
     
-    vertex.position = vec3f(mvertex.x, height, mvertex.y);
+    // vertex.position = vpos;
+    vertex.position = vec3f(mvertex.x, vpos.y, vpos.z);
     var out: VertexOutput;
 
 
@@ -151,7 +153,13 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
 #ifdef VERTEX_COLORS
     // out.color = vertex.color;
-    out.color = vec4f(0.0, 0.0, factor, 1.0);
+    // out.color = vec4f(0.0, 0.0, factor, 1.0);
+    var lc = 0.0;
+    if patch_state.level == 0u {
+        lc = 1.0;
+    }
+    let morph2 = frc*morph_val;
+    out.color = vec4f(mval.x, 0.0, lc, 1.0);
 #endif
 
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX

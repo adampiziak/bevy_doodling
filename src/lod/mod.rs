@@ -253,7 +253,8 @@ pub fn render_lod(
             / 2.0_f32.powf((TREE_DEPTH - patch.level - 1) as f32)
             / (PATCH_HEIGHT - 1) as f32;
         let patch_state = PatchState::new(
-            pl as u32,
+            // pl as u32,
+            patch.level as u32,
             patch.center.x,
             patch.center.y,
             transform.translation.to_array(),

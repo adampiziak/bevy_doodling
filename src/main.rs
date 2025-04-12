@@ -472,8 +472,8 @@ impl MaterialExtension for WireframeMaterial {
         Ok(())
     }
 }
-const TREE_DEPTH: usize = 5;
-const RANGE_MIN_DIS: f32 = 60.0;
+const TREE_DEPTH: usize = 3;
+const RANGE_MIN_DIS: f32 = 20.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
 
