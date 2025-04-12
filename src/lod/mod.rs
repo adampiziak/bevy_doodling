@@ -129,7 +129,7 @@ impl MeshNode {
 }
 
 const PATCH_WIDTH: usize = 40;
-const PARTIAL_PATCH_SIZE: usize = 20;
+const PARTIAL_PATCH_SIZE: usize = 10;
 fn patch_coord2index(x: usize, z: usize, patch_size: usize) -> usize {
     z * patch_size + x
 }
@@ -144,6 +144,7 @@ fn create_patch_mesh(side_vertex_count: usize) -> Mesh {
     let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; side_vertex_count * side_vertex_count];
     let mut uvs: Vec<[f32; 2]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
+    let side_size = side_vertex_count - 1;
 
     for i in 0..side_vertex_count * side_vertex_count {
         let (x, z) = patch_index2coord(i, side_vertex_count);
@@ -342,7 +343,7 @@ pub fn render_lod(
     // let hm_handle = texture_buffer.0.clone();
     // println!("SPAWN {frame_id}");
     PatchState::assert_uniform_compat();
-    let whole_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE * 2);
+    let whole_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE * 2 - 1);
     let partial_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE);
     let whole_mesh_handle = meshes.add(whole_patch_mesh);
     let partial_mesh_handle = meshes.add(partial_patch_mesh);

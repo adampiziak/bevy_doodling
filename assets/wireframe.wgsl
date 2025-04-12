@@ -91,7 +91,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
     let computed_normal = normals[i];
     let computed_tangent = tangents[i];
-    var vpos = vec3f(x, 1.0, z);
+    var vpos = vec3f(x, 0.0, z);
     // if patch_state.partial == 1u {
     //     vpos.y += 50.0;
     // }
