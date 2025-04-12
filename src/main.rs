@@ -372,6 +372,7 @@ struct PatchState {
     #[align(16)]
     ranges: [Vec4; 16],
     tree_depth: u32,
+    side_length: f32,
 }
 
 impl PatchState {
@@ -382,6 +383,7 @@ impl PatchState {
         camera_cen: [f32; 3],
         vec_ranges: &Vec<f32>,
         tree_depth: u32,
+        side_length: f32,
     ) -> Self {
         let mut ranges = [Vec4::default(); 16];
         for (i, v) in vec_ranges.into_iter().enumerate() {
@@ -394,6 +396,7 @@ impl PatchState {
             camera_pos: Vec4::from_array([camera_cen[0], camera_cen[1], camera_cen[2], 1.0]),
             ranges,
             tree_depth,
+            side_length,
         }
     }
 }

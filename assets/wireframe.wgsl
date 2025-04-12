@@ -32,6 +32,7 @@ struct PatchState {
     camera_pos: vec4f,
     ranges: array<vec4f, 16>,
     tree_depth: u32,
+    side_length: f32,
 }
 @group(2) @binding(101) var<uniform> patch_state: PatchState;
 struct Vertex {
@@ -82,25 +83,34 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let z = zi - 300.0;
 
     let i = u32(600.0*min(round(zi - 0.0), 599.0) + min(round(xi - 0.0), 599.0));
-    let height: f32 = data[i] + 0.02;
+    let height: f32 = data[i] + 0.05;
 
     let computed_normal = normals[i];
     let computed_tangent = tangents[i];
+    var vpos = vec3f(x, height, z);
 
     // CDLOD
     let camera_pos = patch_state.camera_pos.xyz;
-    let dis = distance(camera_pos, vertex.position);
+    let dis = distance(camera_pos.xz, vpos.xz);
 
-    var vi = patch_state.tree_depth - patch_state.level;
-    let low = patch_state.ranges[vi].x;
-    let high = patch_state.ranges[i + 1].x;
+    var low = 0.0;
+    var vi = patch_state.level;
+    if vi != 0 {
+         low = patch_state.ranges[vi - 1].x;
+    }
+    let high = patch_state.ranges[vi].x;
     let delta = high - low;
     let factor = (dis - low) / delta;
 
-    let morph_factor = clamp(factor / 0.5 - 1.0, 0.0, 1.0);
+    let morph_val = clamp(factor / 0.5 - 1.0, 0.0, 1.0);
+    let mesh_dim = vec2f(20.0, 20.0);
+    var mesh_pos = vpos.xz;
+    let frc: vec2f = fract(mesh_pos * patch_state.side_length * 0.5)*2.0/patch_state.side_length;
+    let mvertex = mesh_pos - frc*morph_val;
+    // mesh_pos = mesh_pos - pos_fraction * morph_val;
 
     
-    vertex.position = vec3f(x, height, z);
+    vertex.position = vec3f(mvertex.x, height, mvertex.y);
     var out: VertexOutput;
 
 
@@ -141,7 +151,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
 #ifdef VERTEX_COLORS
     // out.color = vertex.color;
-    out.color = vec4f(0.0, 0.5, 0.0, 1.0);
+    out.color = vec4f(0.0, 0.0, factor, 1.0);
 #endif
 
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX

@@ -249,6 +249,9 @@ pub fn render_lod(
     PatchState::assert_uniform_compat();
     for patch in patches {
         let pl = (TREE_DEPTH as i32 - patch.level as i32).max(0);
+        let side_length = MAP_WIDTH as f32
+            / 2.0_f32.powf((TREE_DEPTH - patch.level - 1) as f32)
+            / (PATCH_HEIGHT - 1) as f32;
         let patch_state = PatchState::new(
             pl as u32,
             patch.center.x,
@@ -256,6 +259,7 @@ pub fn render_lod(
             transform.translation.to_array(),
             &ranges,
             TREE_DEPTH as u32,
+            side_length,
         );
         let cust_mat = ExtendedMaterial {
             base: StandardMaterial {
