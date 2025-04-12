@@ -318,6 +318,7 @@ pub fn render_lod(
         let wire_mat = ExtendedMaterial {
             base: StandardMaterial {
                 perceptual_roughness: 0.8,
+                alpha_mode: AlphaMode::Blend,
                 ..Default::default()
             },
             extension: WireframeMaterial {
