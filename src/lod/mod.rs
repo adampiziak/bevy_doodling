@@ -343,8 +343,8 @@ pub fn render_lod(
     // let hm_handle = texture_buffer.0.clone();
     // println!("SPAWN {frame_id}");
     PatchState::assert_uniform_compat();
-    let whole_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE * 2 - 1);
-    let partial_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE);
+    let whole_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE * 2);
+    let partial_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE + 1);
     let whole_mesh_handle = meshes.add(whole_patch_mesh);
     let partial_mesh_handle = meshes.add(partial_patch_mesh);
     let mut partial_ran = false;
@@ -587,7 +587,7 @@ fn select_lod2(
 fn get_side_length(level: usize) -> f32 {
     let side_length = MAP_WIDTH as f32
         / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32)
-        / (PARTIAL_PATCH_SIZE * 2 - 2) as f32;
+        / (PARTIAL_PATCH_SIZE * 2 - 1) as f32;
     side_length
 }
 

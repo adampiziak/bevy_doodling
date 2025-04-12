@@ -101,6 +101,10 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let map_center = vec2f(300.0, 300.0);
     var x = vertex.position[0]*patch_state.side_length + patch_state.offset_x;
     var z = vertex.position[2]*patch_state.side_length + patch_state.offset_y;
+    var partial = false;
+    if patch_state.partial == 1u {
+        partial = true;
+    }
 
     //CDLOD morph
     var vpos = vec3f(x, 0.0, z);
@@ -115,7 +119,13 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let frc: vec2f = fract(vertex.position.xz * 0.5)*2.0;
     var mvertex = vpos.xz;
     let mval = frc*morph_val*patch_state.side_length;
+    if partial {
+    mvertex -= mval;
+        
+    } else {
     mvertex += mval;
+        
+    }
     x = mvertex.x;
     z = mvertex.y;
 
@@ -132,7 +142,6 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
     
     vertex.position = vec3f(x, height, z);
-    // vertex.position = vec3f(mvertex.x, vpos.y, mvertex.y);
     var out: VertexOutput;
 
     let mesh_world_from_local = mesh_functions::get_world_from_local(vertex.instance_index);
