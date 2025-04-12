@@ -87,6 +87,18 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let computed_normal = normals[i];
     let computed_tangent = tangents[i];
 
+    // CDLOD
+    let camera_pos = patch_state.camera_pos.xyz;
+    let dis = distance(camera_pos, vertex.position);
+
+    var vi = patch_state.tree_depth - patch_state.level;
+    let low = patch_state.ranges[vi].x;
+    let high = patch_state.ranges[i + 1].x;
+    let delta = high - low;
+    let factor = (dis - low) / delta;
+
+    let morph_factor = clamp(factor / 0.5 - 1.0, 0.0, 1.0);
+
     
     vertex.position = vec3f(x, height, z);
     var out: VertexOutput;
@@ -129,18 +141,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
 #ifdef VERTEX_COLORS
     // out.color = vertex.color;
-    let camera_pos = patch_state.camera_pos.xyz;
-    var vi = patch_state.tree_depth - patch_state.level;
-    // if vi > 0 {
-    //     vi -= 1;
-    // }
-    let range = patch_state.ranges[vi].x;
-    let next_range = patch_state.ranges[i + 1].x;
-    let rdis = next_range - range;
-    let dis = distance(camera_pos, vertex.position) - range;
-    let f = (1.0 - dis/rdis) - 0.8;
-
-    out.color = vec4f(0.0, f, 0.0, 1.0);
+    out.color = vec4f(0.0, 0.5, 0.0, 1.0);
 #endif
 
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
