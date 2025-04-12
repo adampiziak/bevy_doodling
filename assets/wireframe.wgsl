@@ -78,8 +78,10 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
     // let a: f32 = textureLoad(texure, vec2u(x, z)).x;
     // let offset = 600.0 / pow(2.0, f32(patch_state.tree_depth - patch_state.level));
-    let xi = vertex.position[0] + patch_state.offset_x - patch_state.patch_size/2.0;
-    let zi = vertex.position[2] + patch_state.offset_y - patch_state.patch_size/2.0;
+    let xi = vertex.position[0]*patch_state.side_length + patch_state.offset_x;
+    let zi = vertex.position[2]*patch_state.side_length + patch_state.offset_y;
+    // let xi = vertex.position[0]*patch_state.side_length;
+    // let zi = vertex.position[2]*patch_state.side_length;
     let x = xi;
     let z = zi;
 

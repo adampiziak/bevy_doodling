@@ -46,10 +46,11 @@ impl MeshNode2 {
 
     fn children(&self) -> Vec<MeshNode2> {
         let mut children = Vec::new();
-        let child_size = self.boundry.half_size();
         let cen = self.boundry.center();
         let min = self.boundry.min;
         let max = self.boundry.max;
+        let half_size = (cen.x - min.x) / 2.0;
+        let half_size = Vec3::new(half_size, 0.0, half_size);
 
         let min_x = (min.x + cen.x) / 2.0;
         let max_x = (max.x + cen.x) / 2.0;
@@ -61,15 +62,15 @@ impl MeshNode2 {
         let lower_left = Vec3::new(min_x, 0.0, min_y);
         let lower_right = Vec3::new(max_x, 0.0, min_y);
 
-        let upper_left_boundry = Aabb3d::new(upper_left, child_size);
-        let upper_right_boundry = Aabb3d::new(upper_right, child_size);
-        let lower_left_boundry = Aabb3d::new(lower_left, child_size);
-        let lower_right_boundry = Aabb3d::new(lower_right, child_size);
+        let upper_left_boundry = Aabb3d::new(upper_left, half_size);
+        let upper_right_boundry = Aabb3d::new(upper_right, half_size);
+        let lower_left_boundry = Aabb3d::new(lower_left, half_size);
+        let lower_right_boundry = Aabb3d::new(lower_right, half_size);
 
         children.push(MeshNode2::new(upper_left_boundry, self.level - 1, false));
         children.push(MeshNode2::new(upper_right_boundry, self.level - 1, false));
         children.push(MeshNode2::new(lower_left_boundry, self.level - 1, false));
-        children.push(MeshNode2::new(lower_left_boundry, self.level - 1, false));
+        children.push(MeshNode2::new(lower_right_boundry, self.level - 1, false));
 
         children
     }
@@ -332,7 +333,7 @@ pub fn render_lod(
     select_lod2(&node2, TREE_DEPTH - 1, &bounding_spheres, &mut patches2);
 
     // remove previous patches
-    // println!("NUM PATCHES: {}", patches.len());
+    println!("NUM PATCHES: {}", patches2.len());
 
     let mut patch_meshes = Vec::new();
 
@@ -350,13 +351,17 @@ pub fn render_lod(
     let whole_mesh_handle = meshes.add(whole_patch_mesh);
     let partial_mesh_handle = meshes.add(partial_patch_mesh);
     for patch in patches2 {
-        let side_length = get_side_length(patch.level);
+        let mut side_length = get_side_length(patch.level);
+        if patch.partial {
+            side_length = 0.0;
+        }
         let patch_size = side_length * (PARTIAL_PATCH_SIZE - 1) as f32;
+        gizmos.sphere(patch.boundry.min, 1.0, colors[patch.level]);
         let patch_state = PatchState::new(
             // pl as u32,
             patch.level as u32,
-            patch.boundry.center().x,
-            patch.boundry.center().z,
+            patch.boundry.min.x,
+            patch.boundry.min.z,
             transform.translation.to_array(),
             &ranges,
             TREE_DEPTH as u32,
