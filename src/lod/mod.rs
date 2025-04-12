@@ -356,10 +356,10 @@ pub fn render_lod(
     let partial_mesh_handle = meshes.add(partial_patch_mesh);
     for patch in patches2 {
         let mut side_length = get_side_length(patch.level) * 2.0;
-        let mut patch_size = side_length * (2 * PARTIAL_PATCH_SIZE - 1) as f32;
+        let patch_size = side_length * (2 * PARTIAL_PATCH_SIZE - 1) as f32;
         if patch.partial {
-            side_length = 0.0;
-            patch_size = 0.0;
+            side_length /= 2.0;
+            // patch_size = 0.0;
         }
 
         let jitter = random_range(0.0_f32..5.0);
