@@ -476,57 +476,9 @@ impl MaterialExtension for WireframeMaterial {
     }
 }
 const TREE_DEPTH: usize = 3;
-const RANGE_MIN_DIS: f32 = 20.0;
+const RANGE_MIN_DIS: f32 = 40.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
-
-fn coord2index(x: usize, z: usize) -> usize {
-    z * MAP_HEIGHT + x
-}
-
-fn index2coord(index: usize) -> (usize, usize) {
-    let x = index % MAP_HEIGHT;
-    let z = index / MAP_HEIGHT;
-    (x, z)
-}
-
-fn create_terrain_mesh() -> Mesh {
-    let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; MAP_HEIGHT * MAP_WIDTH];
-    let mut indices: Vec<u32> = Vec::new();
-
-    let mut rng = rng();
-    for i in 0..MAP_HEIGHT * MAP_WIDTH {
-        let (x, z) = index2coord(i);
-        positions[i as usize] = [x as f32, rng.random_range(0_f32..10.0), z as f32];
-    }
-
-    // create triangles
-    // go throw each row of mesh, and create triangles for row
-    // * ------ * -------
-    // | \      |
-    // |    \   |  etc...
-    // |       \|
-    // * ------ * -------
-    for row in 0..(MAP_HEIGHT - 1) {
-        for col in 0..(MAP_WIDTH - 1) {
-            let top_left = coord2index(row + 1, col) as u32;
-            let top_right = coord2index(row + 1, col + 1) as u32;
-            let bottom_left = coord2index(row, col) as u32;
-            let bottom_right = coord2index(row, col + 1) as u32;
-            let mut triangle1 = vec![top_left, bottom_left, bottom_right];
-            let mut triangle2 = vec![top_left, bottom_right, top_right];
-            indices.append(&mut triangle1);
-            indices.append(&mut triangle2);
-        }
-    }
-
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
-
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_indices(Indices::U32(indices));
-
-    mesh
-}
 
 fn setup(
     mut commands: Commands,

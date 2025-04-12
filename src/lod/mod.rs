@@ -1,8 +1,8 @@
 use bevy::{
     asset::RenderAssetUsages,
     color::palettes::{
-        css::RED,
-        tailwind::{INDIGO_600, RED_500},
+        css::{GREEN, RED},
+        tailwind::{BLUE_200, INDIGO_600, PURPLE_500, RED_300, RED_500, YELLOW_500},
     },
     ecs::{component::Component, system::Commands},
     image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
@@ -23,9 +23,8 @@ use kdtree::KdTree;
 use rand::{Rng, rng};
 
 use crate::{
-    CustomMaterial, EventTimer, HeightBuffer, HeightMapTexture, MAP_WIDTH, NormalBuffer,
-    PatchState, RANGE_MIN_DIS, TREE_DEPTH, TangentBuffer, WireframeMaterial, coord2index,
-    get_mesh_positions, index2coord,
+    CustomMaterial, EventTimer, HeightBuffer, MAP_WIDTH, NormalBuffer, PatchState, RANGE_MIN_DIS,
+    TREE_DEPTH, TangentBuffer, WireframeMaterial,
 };
 
 struct MeshNode {
@@ -76,15 +75,6 @@ impl MeshNode {
     }
 }
 
-// type MeshGrid = [[f64; NODE_SIZE]; NODE_SIZE];
-
-// fn create_mesh_node(size: f32) -> Mesh {
-//     let normal = Dir3::new(Vec3::new(0.0, 1.0, 0.0)).unwrap();
-//     let size_vec = Vec2::new(size, size);
-//     let mesh = PlaneMeshBuilder::new(normal, size_vec)
-//         .subdivisions(MESH_SUBDIVISIONS)
-//         .build();
-//     mesh
 const PATCH_WIDTH: usize = 40;
 const PATCH_HEIGHT: usize = 20;
 fn patch_coord2index(x: usize, z: usize) -> usize {
@@ -150,25 +140,6 @@ fn create_terrain_mesh_node(level: usize) -> Mesh {
 
     mesh
 }
-fn create_mesh_node(size: f32) -> Mesh {
-    let mut positions = Vec::new();
-
-    positions.push([-1.0, 0.0, -1.0]);
-    positions.push([1.0, 0.0, -1.0]);
-    positions.push([-1.0, 0.0, 1.0]);
-    positions.push([1.0, 0.0, 1.0]);
-    for p in positions.iter_mut() {
-        p[0] *= size / 2.0;
-        p[2] *= size / 2.0;
-    }
-    let indices = vec![0, 2, 1, 1, 2, 3];
-    let mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all())
-        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
-        .with_inserted_indices(Indices::U32(indices));
-
-    mesh
-}
-
 #[derive(Component)]
 pub struct PatchLabel(u32);
 
@@ -184,6 +155,7 @@ pub fn render_lod(
     // texture_buffer: Res<HeightMapTexture>,
     mesh_query: Query<(Entity, &PatchLabel)>,
     time: Res<Time>,
+    mut gizmos: Gizmos,
     mut timer: ResMut<EventTimer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut custom_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CustomMaterial>>>,
@@ -193,10 +165,10 @@ pub fn render_lod(
         return;
     };
 
-    timer.field1.tick(time.delta());
-    if !timer.field1.just_finished() {
-        return;
-    }
+    // timer.field1.tick(time.delta());
+    // if !timer.field1.just_finished() {
+    //     return;
+    // }
     let mut rng = rng();
     let frame_id = rng.random_range(0_32..1000000);
     for (entity, label) in mesh_query.iter() {
@@ -212,11 +184,21 @@ pub fn render_lod(
     }
 
     let mut bounding_spheres = Vec::new();
+    let colors: Vec<Color> = vec![
+        BLUE_200.into(),
+        RED_300.into(),
+        YELLOW_500.into(),
+        GREEN.into(),
+        PURPLE_500.into(),
+    ];
 
+    let mut ri = 0;
     for r in &ranges {
         // let sphere = Sphere::new(r);
         let bsphere = BoundingSphere::new(transform.translation, *r);
+        gizmos.sphere(transform.translation, *r, colors[ri]);
         bounding_spheres.push(bsphere);
+        ri += 1;
     }
 
     let camera_center = transform.translation.xz();

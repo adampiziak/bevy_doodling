@@ -77,14 +77,14 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     // let height = f32(patch_state.level)*5.0;
 
     // let a: f32 = textureLoad(texure, vec2u(x, z)).x;
-    let offset = 600.0 / pow(2.0, f32(patch_state.tree_depth - patch_state.level));
-    let xi = vertex.position[0] + patch_state.offset_x - offset + 300.0;
-    let zi = vertex.position[2] + patch_state.offset_y - offset + 300.0;
-    let x = xi - 300.0;
-    let z = zi - 300.0;
+    // let offset = 600.0 / pow(2.0, f32(patch_state.tree_depth - patch_state.level));
+    let xi = vertex.position[0] + patch_state.offset_x - patch_state.patch_size/2.0;
+    let zi = vertex.position[2] + patch_state.offset_y - patch_state.patch_size/2.0;
+    let x = xi;
+    let z = zi;
 
     let i = u32(600.0*min(round(zi - 0.0), 599.0) + min(round(xi - 0.0), 599.0));
-    let height: f32 = data[i] + 0.4;
+    let height: f32 = data[i] + 5.0;
 
     let computed_normal = normals[i];
     let computed_tangent = tangents[i];
@@ -96,9 +96,9 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
     var low = 0.0;
     var vi = patch_state.level;
-    if vi != 0 {
-         low = patch_state.ranges[vi - 1].x;
-    }
+    // if vi != 0u {
+    //      low = patch_state.ranges[vi - 1].x;
+    // }
     let high = patch_state.ranges[vi].x;
     let delta = high - low;
     let factor = (dis - low) / delta;
@@ -159,8 +159,8 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     if patch_state.level == 0u {
         lc = 1.0;
     }
-    let morph2 = frc*morph_val;
-    out.color = vec4f(mval.x, 0.0, lc, 1.0);
+    // let morph2 = frc*morph_val;
+    out.color = vec4f(0.0, 0.0, lc, 1.0);
 #endif
 
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
