@@ -87,11 +87,11 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let z = zi;
 
     let i = u32(600.0*min(round(zi - 0.0), 599.0) + min(round(xi - 0.0), 599.0));
-    let height: f32 = data[i] + 10.0;
+    let height: f32 = data[i];
 
     let computed_normal = normals[i];
     let computed_tangent = tangents[i];
-    var vpos = vec3f(x, 0.0, z);
+    var vpos = vec3f(x, height, z);
     // if patch_state.partial == 1u {
     //     vpos.y += 50.0;
     // }
@@ -110,7 +110,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let factor = (dis - low) / delta;
 
     let morph_val = clamp(factor/0.5  - 1.0, 0.0, 1.0);
-    let frc: vec2f = fract(vertex.position.xz/patch_state.side_length * 0.5)*2.0;
+    let frc: vec2f = fract(vertex.position.xz * 0.5)*2.0;
     var mvertex = vpos.xz;
     // var mval = vec2f(0.0, 0.0);
     let    mval = frc*morph_val*patch_state.side_length;
@@ -118,8 +118,8 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     // mesh_pos = mesh_pos - pos_fraction * morph_val;
 
     
-    vertex.position = vpos;
-    // vertex.position = vec3f(mvertex.x, vpos.y, vpos.z);
+    // vertex.position = vpos;
+    vertex.position = vec3f(mvertex.x, vpos.y, mvertex.y);
     var out: VertexOutput;
 
 
