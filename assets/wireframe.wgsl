@@ -166,9 +166,9 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
         lc = 1.0;
     }
     var pc = 0.0;
-    if patch_state.partial == 1u {
-        pc = 1.0;
-    }
+    // if patch_state.partial == 1u {
+    //     pc = 1.0;
+    // }
     // let morph2 = frc*morph_val;
     out.color = vec4f(0.0, pc, lc, 1.0);
 #endif
