@@ -90,7 +90,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
     let computed_normal = normals[i];
     let computed_tangent = tangents[i];
-    var vpos = vec3f(x, height, z);
+    var vpos = vec3f(x, 0.0, z);
 
     // CDLOD
     let camera_pos = patch_state.camera_pos.xyz;

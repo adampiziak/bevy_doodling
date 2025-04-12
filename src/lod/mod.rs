@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use bevy::{
     asset::RenderAssetUsages,
     color::palettes::{
-        css::{GREEN, RED},
+        css::{GREEN, RED, SALMON},
         tailwind::{BLUE_200, INDIGO_600, PURPLE_500, RED_300, RED_500, YELLOW_500},
     },
     ecs::{component::Component, system::Commands},
@@ -22,7 +22,7 @@ use bevy::{
     },
 };
 use kdtree::KdTree;
-use rand::{Rng, rng};
+use rand::{Rng, random_range, rng};
 
 use crate::{
     CustomMaterial, EventTimer, HeightBuffer, MAP_HEIGHT, MAP_WIDTH, NormalBuffer, PatchState,
@@ -54,9 +54,13 @@ impl MeshNode2 {
 
         let min_x = (min.x + cen.x) / 2.0;
         let max_x = (max.x + cen.x) / 2.0;
-        let min_y = (min.y + cen.y) / 2.0;
-        let max_y = (max.y + cen.y) / 2.0;
+        let min_y = (min.z + cen.z) / 2.0;
+        let max_y = (max.z + cen.z) / 2.0;
 
+        // let upper_left = Vec3::new(min_x, 0.0, max_y);
+        // let upper_right = Vec3::new(max_x, 0.0, max_y);
+        // let lower_left = Vec3::new(min_x, 0.0, min_y);
+        // let lower_right = Vec3::new(max_x, 0.0, min_y);
         let upper_left = Vec3::new(min_x, 0.0, max_y);
         let upper_right = Vec3::new(max_x, 0.0, max_y);
         let lower_left = Vec3::new(min_x, 0.0, min_y);
@@ -351,13 +355,22 @@ pub fn render_lod(
     let whole_mesh_handle = meshes.add(whole_patch_mesh);
     let partial_mesh_handle = meshes.add(partial_patch_mesh);
     for patch in patches2 {
-        let mut side_length = get_side_length(patch.level);
+        let mut side_length = get_side_length(patch.level) * 2.0;
         let mut patch_size = side_length * (2 * PARTIAL_PATCH_SIZE - 1) as f32;
         if patch.partial {
             side_length = 0.0;
             patch_size = 0.0;
         }
-        gizmos.sphere(patch.boundry.min, 1.0, colors[patch.level]);
+
+        let jitter = random_range(0.0_f32..5.0);
+        // let gcen = patch.boundry.min + Vec3A::new(jitter, 0.0, 0.0);
+        let gcen = patch.boundry.min;
+        gizmos.sphere(gcen, 1.0, colors[patch.level]);
+        gizmos.rect(
+            Isometry3d::new(patch.boundry.center(), Quat::from_rotation_x(PI / 2.)),
+            patch.boundry.half_size().xz() * 2.0,
+            SALMON,
+        );
         let patch_state = PatchState::new(
             // pl as u32,
             patch.level as u32,
@@ -565,7 +578,7 @@ fn select_lod2(
 fn get_side_length(level: usize) -> f32 {
     let side_length = MAP_WIDTH as f32
         / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32)
-        / (PARTIAL_PATCH_SIZE * 2 - 1) as f32;
+        / (PARTIAL_PATCH_SIZE * 2 - 2) as f32;
     side_length
 }
 
