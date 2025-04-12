@@ -46,6 +46,7 @@ impl MeshNode2 {
 
     fn children(&self) -> Vec<MeshNode2> {
         let mut children = Vec::new();
+        let child_size = self.boundry.half_size();
         let cen = self.boundry.center();
         let min = self.boundry.min;
         let max = self.boundry.max;
@@ -54,6 +55,21 @@ impl MeshNode2 {
         let max_x = (max.x + cen.x) / 2.0;
         let min_y = (min.y + cen.y) / 2.0;
         let max_y = (max.y + cen.y) / 2.0;
+
+        let upper_left = Vec3::new(min_x, 0.0, max_y);
+        let upper_right = Vec3::new(max_x, 0.0, max_y);
+        let lower_left = Vec3::new(min_x, 0.0, min_y);
+        let lower_right = Vec3::new(max_x, 0.0, min_y);
+
+        let upper_left_boundry = Aabb3d::new(upper_left, child_size);
+        let upper_right_boundry = Aabb3d::new(upper_right, child_size);
+        let lower_left_boundry = Aabb3d::new(lower_left, child_size);
+        let lower_right_boundry = Aabb3d::new(lower_right, child_size);
+
+        children.push(MeshNode2::new(upper_left_boundry, self.level - 1, false));
+        children.push(MeshNode2::new(upper_right_boundry, self.level - 1, false));
+        children.push(MeshNode2::new(lower_left_boundry, self.level - 1, false));
+        children.push(MeshNode2::new(lower_left_boundry, self.level - 1, false));
 
         children
     }
