@@ -34,6 +34,7 @@ struct PatchState {
     tree_depth: u32,
     side_length: f32,
     patch_size: f32,
+    partial: u32,
 }
 @group(2) @binding(101) var<uniform> patch_state: PatchState;
 struct Vertex {
@@ -90,7 +91,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
     let computed_normal = normals[i];
     let computed_tangent = tangents[i];
-    var vpos = vec3f(x, 0.0, z);
+    var vpos = vec3f(x, 1.0, z);
 
     // CDLOD
     let camera_pos = patch_state.camera_pos.xyz;
@@ -161,8 +162,12 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     if patch_state.level == 0u {
         lc = 1.0;
     }
+    var pc = 0.0;
+    if patch_state.partial == 1u {
+        pc = 1.0;
+    }
     // let morph2 = frc*morph_val;
-    out.color = vec4f(0.0, 0.0, lc, 1.0);
+    out.color = vec4f(0.0, pc, lc, 1.0);
 #endif
 
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX

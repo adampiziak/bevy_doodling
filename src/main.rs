@@ -374,6 +374,7 @@ struct PatchState {
     tree_depth: u32,
     side_length: f32,
     patch_size: f32,
+    partial: u32,
 }
 
 impl PatchState {
@@ -386,6 +387,7 @@ impl PatchState {
         tree_depth: u32,
         side_length: f32,
         patch_size: f32,
+        partial: u32,
     ) -> Self {
         let mut ranges = [Vec4::default(); 16];
         for (i, v) in vec_ranges.into_iter().enumerate() {
@@ -400,6 +402,7 @@ impl PatchState {
             tree_depth,
             side_length,
             patch_size,
+            partial,
         }
     }
 }

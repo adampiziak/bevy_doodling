@@ -371,6 +371,7 @@ pub fn render_lod(
             patch.boundry.half_size().xz() * 2.0,
             SALMON,
         );
+        let partial_flag = if patch.partial { 1 } else { 0 };
         let patch_state = PatchState::new(
             // pl as u32,
             patch.level as u32,
@@ -381,6 +382,7 @@ pub fn render_lod(
             TREE_DEPTH as u32,
             side_length,
             patch_size,
+            partial_flag,
         );
         let cust_mat = ExtendedMaterial {
             base: StandardMaterial {
