@@ -154,16 +154,17 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 #ifdef VERTEX_COLORS
     // out.color = vertex.color;
     // out.color = vec4f(0.0, 0.0, factor, 1.0);
-    var lc = 0.0;
+    let base = 0.4;
+    var lc = base;
     if patch_state.level == 0u {
         lc = 0.8;
     }
-    var pc = 0.0;
+    var pc = base;
     if patch_state.partial == 1u {
-        pc = 0.3;
+        pc = 0.8;
     }
     // let morph2 = frc*morph_val;
-    out.color = vec4f(0.0, pc, lc, 1.0);
+    out.color = vec4f(base, pc, lc, 1.0);
 #endif
 
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
