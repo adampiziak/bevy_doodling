@@ -98,29 +98,42 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let map_width = 600;
     let map_height = 600u;
     let pl = patch_state.level;
-    // let scale =pow(1.1, f32(pl));
     let map_center = vec2f(300.0, 300.0);
-    // let x = vertex.position[0];
-    // let z = vertex.position[2];    // let i = z*map_height + x;
-    // let height = f32(patch_state.level)*5.0;
+    var x = vertex.position[0]*patch_state.side_length + patch_state.offset_x;
+    var z = vertex.position[2]*patch_state.side_length + patch_state.offset_y;
 
-    // let a: f32 = textureLoad(texure, vec2u(x, z)).x;
-    let offset = 600.0 / pow(2.0, f32(patch_state.tree_depth - patch_state.level));
-    let xi = vertex.position[0] + patch_state.offset_x - offset + 300.0;
-    let zi = vertex.position[2] + patch_state.offset_y - offset + 300.0;
-    let x = xi - 300.0;
-    let z = zi - 300.0;
+    //CDLOD morph
+    var vpos = vec3f(x, 0.0, z);
+    let camera_pos = patch_state.camera_pos.xyz;
+    let dis = distance(camera_pos.xz, vpos.xz);
+    var low = 0.0;
+    var vi = patch_state.level;
+    let high = patch_state.ranges[vi].x;
+    let delta = high - low;
+    let factor = (dis - low) / delta;
+    let morph_val = clamp(factor/0.5  - 1.0, 0.0, 1.0);
+    let frc: vec2f = fract(vertex.position.xz * 0.5)*2.0;
+    var mvertex = vpos.xz;
+    let mval = frc*morph_val*patch_state.side_length;
+    mvertex += mval;
+    x = mvertex.x;
+    z = mvertex.y;
 
-    let i = u32(600.0*min(round(zi - 0.0), 599.0) + min(round(xi - 0.0), 599.0));
+    
+    let xi = x + 300.0;
+    let zi = z + 300.0;
+
+    let i = u32(600.0*min(round(zi), 599.0) + min(round(xi), 599.0));
     let height: f32 = data[i];
 
     let computed_normal = normals[i];
     let computed_tangent = tangents[i];
 
+
     
     vertex.position = vec3f(x, height, z);
+    // vertex.position = vec3f(mvertex.x, vpos.y, mvertex.y);
     var out: VertexOutput;
-
 
     let mesh_world_from_local = mesh_functions::get_world_from_local(vertex.instance_index);
     var world_from_local = mesh_world_from_local;

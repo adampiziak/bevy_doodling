@@ -483,13 +483,13 @@ pub fn render_lod(
             whole_mesh_handle.clone()
         };
         let wire_handle = wire_materials.add(wire_mat);
-        // commands.spawn((
-        //     Mesh3d(mesh_handle.clone()),
-        //     MeshMaterial3d(mat_handle.clone()),
-        //     NoFrustumCulling,
-        //     // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
-        //     PatchLabel(frame_id),
-        // ));
+        commands.spawn((
+            Mesh3d(mesh_handle.clone()),
+            MeshMaterial3d(mat_handle.clone()),
+            NoFrustumCulling,
+            // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
+            PatchLabel(frame_id),
+        ));
         commands.spawn((
             Mesh3d(mesh_handle),
             MeshMaterial3d(wire_handle),
