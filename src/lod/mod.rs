@@ -204,7 +204,8 @@ pub fn render_lod(
     let camera_center = transform.translation.xz();
     println!("CAMERA {:?}", camera_center);
     let bwidth = MAP_WIDTH as f32;
-    // let boundry_rect = Rect::new(-bwidth, -bwidth, bwidth, bwidth);
+    let largest_patch_size = PATCH_HEIGHT as f32 * 2.0_f32.powf(TREE_DEPTH as f32 - 1.0);
+    let bwidth = largest_patch_size;
 
     let node = MeshNode::new(
         Vec2::new(0.0, 0.0),
