@@ -130,34 +130,25 @@ impl MeshNode {
 
 const PATCH_WIDTH: usize = 40;
 const PARTIAL_PATCH_SIZE: usize = 20;
-fn patch_coord2index(x: usize, z: usize) -> usize {
-    z * PARTIAL_PATCH_SIZE + x
+fn patch_coord2index(x: usize, z: usize, patch_size: usize) -> usize {
+    z * patch_size + x
 }
 
-fn patch_index2coord(index: usize) -> (usize, usize) {
-    let x = index % PARTIAL_PATCH_SIZE;
-    let z = index / PARTIAL_PATCH_SIZE;
+fn patch_index2coord(index: usize, patch_size: usize) -> (usize, usize) {
+    let x = index % patch_size;
+    let z = index / patch_size;
     (x, z)
 }
 
-fn create_patch_mesh(size: usize) -> Mesh {
-    let node_height = size;
-    let node_width = node_height;
-    let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; node_width * node_height];
+fn create_patch_mesh(side_vertex_count: usize) -> Mesh {
+    let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; side_vertex_count * side_vertex_count];
     let mut uvs: Vec<[f32; 2]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
-    // let level = 0;
-    // let side_length =
-    //     MAP_WIDTH as f32 / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32) / (node_width - 1) as f32;
-    let side_length = 1.0;
 
-    // let mut rng = rng();
-    for i in 0..node_width * node_height {
-        let (x, z) = patch_index2coord(i);
-        let xoffset = x as f32 * side_length;
-        let zoffset = z as f32 * side_length;
-        positions[i as usize] = [xoffset, 5.0, zoffset];
-        uvs.push([xoffset, zoffset]);
+    for i in 0..side_vertex_count * side_vertex_count {
+        let (x, z) = patch_index2coord(i, side_vertex_count);
+        positions[i as usize] = [x as f32, 5.0, z as f32];
+        uvs.push([x as f32, z as f32]);
     }
 
     // create triangles
@@ -167,12 +158,12 @@ fn create_patch_mesh(size: usize) -> Mesh {
     // |    \   |  etc...
     // |       \|
     // * ------ * -------
-    for row in 0..(node_height - 1) {
-        for col in 0..(node_width - 1) {
-            let top_left = patch_coord2index(row + 1, col) as u32;
-            let top_right = patch_coord2index(row + 1, col + 1) as u32;
-            let bottom_left = patch_coord2index(row, col) as u32;
-            let bottom_right = patch_coord2index(row, col + 1) as u32;
+    for row in 0..(side_vertex_count - 1) {
+        for col in 0..(side_vertex_count - 1) {
+            let top_left = patch_coord2index(row + 1, col, side_vertex_count) as u32;
+            let top_right = patch_coord2index(row + 1, col + 1, side_vertex_count) as u32;
+            let bottom_left = patch_coord2index(row, col, side_vertex_count) as u32;
+            let bottom_right = patch_coord2index(row, col + 1, side_vertex_count) as u32;
             let mut triangle1 = vec![top_left, bottom_left, bottom_right];
             // triangle1.reverse();
             let mut triangle2 = vec![top_left, bottom_right, top_right];
@@ -195,6 +186,7 @@ fn create_patch_mesh(size: usize) -> Mesh {
     mesh
 }
 // Mesh for smallest patch
+/*
 fn create_terrain_mesh_node(level: usize) -> Mesh {
     let node_height = PARTIAL_PATCH_SIZE;
     let node_width = node_height;
@@ -246,7 +238,7 @@ fn create_terrain_mesh_node(level: usize) -> Mesh {
     mesh.generate_tangents().unwrap();
 
     mesh
-}
+}*/
 #[derive(Component)]
 pub struct PatchLabel(u32);
 
@@ -339,13 +331,13 @@ pub fn render_lod(
     // remove previous patches
     println!("NUM PATCHES: {}", patches2.len());
 
-    let mut patch_meshes = Vec::new();
+    // let mut patch_meshes = Vec::new();
 
-    for level in 0..TREE_DEPTH {
-        let mesh = create_terrain_mesh_node(level);
-        let mesh_handle = meshes.add(mesh);
-        patch_meshes.push(mesh_handle);
-    }
+    // for level in 0..TREE_DEPTH {
+    //     let mesh = create_terrain_mesh_node(level);
+    //     let mesh_handle = meshes.add(mesh);
+    //     patch_meshes.push(mesh_handle);
+    // }
 
     // let hm_handle = texture_buffer.0.clone();
     // println!("SPAWN {frame_id}");
@@ -354,18 +346,32 @@ pub fn render_lod(
     let partial_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE);
     let whole_mesh_handle = meshes.add(whole_patch_mesh);
     let partial_mesh_handle = meshes.add(partial_patch_mesh);
+    let mut partial_ran = false;
     for patch in patches2 {
-        let mut side_length = get_side_length(patch.level) * 2.0;
-        let patch_size = side_length * (2 * PARTIAL_PATCH_SIZE - 1) as f32;
+        // if patch.partial {
+        //     if partial_ran {
+        //         continue;
+        //     } else {
+        //         partial_ran = true;
+        //     }
+        // }
+        let mut side_length = get_side_length(patch.level);
+        // let partial_side_length = get_side_length(patch.level);
+        // let patch_size = side_length * (8 * PARTIAL_PATCH_SIZE - 1) as f32;
+        let patch_size = 0.0;
         if patch.partial {
-            side_length /= 2.0;
+            // side_length = 0.0;
             // patch_size = 0.0;
         }
 
         let jitter = random_range(0.0_f32..5.0);
         // let gcen = patch.boundry.min + Vec3A::new(jitter, 0.0, 0.0);
         let gcen = patch.boundry.min;
-        gizmos.sphere(gcen, 1.0, colors[patch.level]);
+        let mut ssize = 1.0;
+        if patch.partial {
+            ssize = 5.0;
+        }
+        gizmos.sphere(gcen, ssize, colors[patch.level]);
         gizmos.rect(
             Isometry3d::new(patch.boundry.center(), Quat::from_rotation_x(PI / 2.)),
             patch.boundry.half_size().xz() * 2.0,
@@ -471,18 +477,18 @@ pub fn render_lod(
         let mat_handle = custom_materials.add(cust_mat);
         // let mesh_handle = patch_meshes[patch.level].clone();
         let mesh_handle = if patch.partial {
-            whole_mesh_handle.clone()
-        } else {
             partial_mesh_handle.clone()
+        } else {
+            whole_mesh_handle.clone()
         };
         let wire_handle = wire_materials.add(wire_mat);
-        commands.spawn((
-            Mesh3d(mesh_handle.clone()),
-            MeshMaterial3d(mat_handle.clone()),
-            NoFrustumCulling,
-            // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
-            PatchLabel(frame_id),
-        ));
+        // commands.spawn((
+        //     Mesh3d(mesh_handle.clone()),
+        //     MeshMaterial3d(mat_handle.clone()),
+        //     NoFrustumCulling,
+        //     // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
+        //     PatchLabel(frame_id),
+        // ));
         commands.spawn((
             Mesh3d(mesh_handle),
             MeshMaterial3d(wire_handle),
@@ -562,15 +568,15 @@ fn select_lod2(
     if !node.boundry.intersects(&next_lod_boundry) {
         patches.push(Patch::new(node.boundry, level, false));
     }
-
     // The next LOD range DOES intersect this node
     // We need to check to see which child nodes
     // are within the next node
-
-    for child in node.children() {
-        if !select_lod2(&child, level - 1, ranges, patches) {
-            // Child node not within next range, add part of current node
-            patches.push(Patch::new(child.boundry, level, true)); // true -> partial node
+    else {
+        for child in node.children() {
+            if !select_lod2(&child, level - 1, ranges, patches) {
+                // Child node not within next range, add part of current node
+                patches.push(Patch::new(child.boundry, level, true)); // true -> partial node
+            }
         }
     }
 
