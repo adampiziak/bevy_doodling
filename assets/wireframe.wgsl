@@ -84,7 +84,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let z = zi;
 
     let i = u32(600.0*min(round(zi - 0.0), 599.0) + min(round(xi - 0.0), 599.0));
-    let height: f32 = data[i] + 5.0;
+    let height: f32 = data[i] + 10.0;
 
     let computed_normal = normals[i];
     let computed_tangent = tangents[i];
@@ -112,8 +112,8 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     // mesh_pos = mesh_pos - pos_fraction * morph_val;
 
     
-    // vertex.position = vpos;
-    vertex.position = vec3f(mvertex.x, vpos.y, vpos.z);
+    vertex.position = vpos;
+    // vertex.position = vec3f(mvertex.x, vpos.y, vpos.z);
     var out: VertexOutput;
 
 

@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use bevy::{
     asset::RenderAssetUsages,
     color::palettes::{
@@ -23,9 +25,25 @@ use kdtree::KdTree;
 use rand::{Rng, rng};
 
 use crate::{
-    CustomMaterial, EventTimer, HeightBuffer, MAP_WIDTH, NormalBuffer, PatchState, RANGE_MIN_DIS,
-    TREE_DEPTH, TangentBuffer, WireframeMaterial,
+    CustomMaterial, EventTimer, HeightBuffer, MAP_HEIGHT, MAP_WIDTH, NormalBuffer, PatchState,
+    RANGE_MIN_DIS, TREE_DEPTH, TangentBuffer, WireframeMaterial,
 };
+
+struct MeshNode2 {
+    boundry: Aabb3d,
+    level: usize,
+    partial: bool,
+}
+
+impl MeshNode2 {
+    fn new(boundry: Aabb3d, level: usize, partial: bool) -> Self {
+        Self {
+            boundry,
+            level,
+            partial,
+        }
+    }
+}
 
 struct MeshNode {
     center: Vec2,
@@ -193,6 +211,11 @@ pub fn render_lod(
     ];
 
     let mut ri = 0;
+    gizmos.rect(
+        Isometry3d::new(Vec3::new(0.0, 2.0, 0.0), Quat::from_rotation_x(PI / 2.)),
+        Vec2::new(MAP_WIDTH as f32, MAP_HEIGHT as f32),
+        Color::WHITE,
+    );
     for r in &ranges {
         // let sphere = Sphere::new(r);
         let bsphere = BoundingSphere::new(transform.translation, *r);
@@ -205,7 +228,11 @@ pub fn render_lod(
     println!("CAMERA {:?}", camera_center);
     let bwidth = MAP_WIDTH as f32;
     let largest_patch_size = PATCH_HEIGHT as f32 * 2.0_f32.powf(TREE_DEPTH as f32 - 1.0);
-    let bwidth = largest_patch_size;
+    // let bwidth = largest_patch_size;
+    let map_boundry = Aabb3d::new(
+        Vec3::new(0.0, 0.0, 0.0),
+        Vec3::new(MAP_WIDTH as f32 / 2.0, 0.0, MAP_HEIGHT as f32 / 2.0),
+    );
 
     let node = MeshNode::new(
         Vec2::new(0.0, 0.0),
@@ -213,8 +240,12 @@ pub fn render_lod(
         Vec3::new(bwidth / 2.0, 1.0, bwidth / 2.0),
     );
 
-    let mut patches = Vec::new();
-    select_lod(&node, &mut patches, TREE_DEPTH - 1, &bounding_spheres);
+    let node2 = MeshNode2::new(map_boundry, TREE_DEPTH - 1, false);
+
+    // let mut patches = Vec::new();
+    let mut patches2 = Vec::new();
+    // select_lod(&node, &mut patches, TREE_DEPTH - 1, &bounding_spheres);
+    select_lod2(node2, TREE_DEPTH, &bounding_spheres, &mut patches);
 
     // remove previous patches
     // println!("NUM PATCHES: {}", patches.len());
@@ -231,7 +262,6 @@ pub fn render_lod(
     // println!("SPAWN {frame_id}");
     PatchState::assert_uniform_compat();
     for patch in patches {
-        let pl = (TREE_DEPTH as i32 - patch.level as i32).max(0);
         let side_length = MAP_WIDTH as f32
             / 2.0_f32.powf((TREE_DEPTH - patch.level - 1) as f32)
             / (PATCH_HEIGHT - 1) as f32;
@@ -365,6 +395,28 @@ impl PatchInfo {
             level: node.level,
         }
     }
+}
+
+struct QuadTree {}
+impl QuadTree {
+    fn new(map_boundry: Aabb3d, level_boundries: Vec<BoundingSphere>) -> QuadTree {
+        QuadTree {}
+    }
+}
+
+fn select_lod2(
+    node: MeshNode2,
+    level: usize,
+    ranges: &Vec<BoundingSphere>,
+    patches: &mut Vec<MeshNode2>,
+) -> bool {
+    let lodBoundry = ranges[level];
+    if !node.boundry.intersects(&lodBoundry) {}
+    if level == 0 {
+        patches.push(node);
+        return true;
+    }
+    true
 }
 
 fn select_lod(
