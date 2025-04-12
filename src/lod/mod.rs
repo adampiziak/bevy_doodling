@@ -11,7 +11,7 @@ use bevy::{
         bounding::{Aabb3d, BoundingSphere, IntersectsVolume},
         primitives::Cuboid,
     },
-    pbr::ExtendedMaterial,
+    pbr::{ExtendedMaterial, NotShadowCaster},
     prelude::*,
     render::{
         mesh::{Indices, Mesh, Mesh3d, MeshBuilder, PlaneMeshBuilder, PrimitiveTopology},
@@ -23,8 +23,8 @@ use rand::{Rng, rng};
 
 use crate::{
     CustomMaterial, EventTimer, HeightBuffer, HeightMapTexture, MAP_WIDTH, NormalBuffer,
-    PatchState, RANGE_MIN_DIS, TREE_DEPTH, TangentBuffer, coord2index, get_mesh_positions,
-    index2coord,
+    PatchState, RANGE_MIN_DIS, TREE_DEPTH, TangentBuffer, WireframeMaterial, coord2index,
+    get_mesh_positions, index2coord,
 };
 
 struct MeshNode {
@@ -184,6 +184,7 @@ pub fn render_lod(
     mut timer: ResMut<EventTimer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut custom_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CustomMaterial>>>,
+    mut wire_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, WireframeMaterial>>>,
 ) {
     let Ok(transform) = mock_camera.single() else {
         return;
@@ -314,19 +315,32 @@ pub fn render_lod(
                 )),
             },
         };
-        let w = MAP_WIDTH as f32 / 2.0_f32.powf((TREE_DEPTH - patch.level - 1) as f32);
-        // println!(
-        //     "PATCH LEVEL {}, CENTER {}, width: {w}",
-        //     patch.level, patch.center
-        // );
+        let wire_mat = ExtendedMaterial {
+            base: StandardMaterial {
+                perceptual_roughness: 0.8,
+                ..Default::default()
+            },
+            extension: WireframeMaterial {
+                heightmap: buffer.0.clone(),
+                normals: normal_buffer.0.clone(),
+                tangents: tangent_buffer.0.clone(),
+                level: PatchState::new(pl as u32, patch.center.x, patch.center.y),
+            },
+        };
+
         let mat_handle = custom_materials.add(cust_mat);
-        // let scale = 2.0_f32.powf(patch.level as f32 + 1.0) - 1.0;
-        // let scale = 0.86 / 2.1 * (2.0_f32.powf(patch.level as f32));
-        let scale = 1.0;
         let mesh_handle = patch_meshes[patch.level].clone();
+        let wire_handle = wire_materials.add(wire_mat);
+        commands.spawn((
+            Mesh3d(mesh_handle.clone()),
+            MeshMaterial3d(mat_handle.clone()),
+            NoFrustumCulling,
+            // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
+            PatchLabel(frame_id),
+        ));
         commands.spawn((
             Mesh3d(mesh_handle),
-            MeshMaterial3d(mat_handle.clone()),
+            MeshMaterial3d(wire_handle),
             NoFrustumCulling,
             // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
             PatchLabel(frame_id),
@@ -399,6 +413,7 @@ pub fn setup_mock_camera(
         MeshMaterial3d(materials.add(Color::from(INDIGO_600))),
         Transform::from_xyz(0.0, 10.0, 0.0).with_scale(Vec3::new(cscale, cscale, cscale)),
         MockCamera,
+        NotShadowCaster,
     ));
 
     // let mesh = create_mesh_node(MAP_SIZE as f32);

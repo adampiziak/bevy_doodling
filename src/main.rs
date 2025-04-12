@@ -2,10 +2,13 @@ use bevy::{
     asset::RenderAssetUsages,
     color::palettes::css::{BLUE, WHITE},
     dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
-    pbr::{ExtendedMaterial, MaterialExtension},
+    pbr::{
+        ExtendedMaterial, MaterialExtension, NotShadowCaster,
+        wireframe::{WireframeConfig, WireframePlugin},
+    },
     prelude::*,
     render::{
-        Render, RenderApp, RenderSet,
+        Render, RenderApp, RenderPlugin, RenderSet,
         extract_component::ExtractComponent,
         extract_resource::{ExtractResource, ExtractResourcePlugin},
         gpu_readback::{Readback, ReadbackComplete},
@@ -17,6 +20,7 @@ use bevy::{
             *,
         },
         renderer::{RenderContext, RenderDevice},
+        settings::{RenderCreation, WgpuSettings},
         storage::{GpuShaderStorageBuffer, ShaderStorageBuffer},
         texture::GpuImage,
     },
@@ -27,6 +31,7 @@ use rand::{Rng, distr::uniform, rng};
 
 const COMPUTE_SHADER_ASSET_PATH: &str = "compute.wgsl";
 const TERRAIN_SHADER_PATH: &str = "terrain.wgsl";
+const WIREFRAME_SHADER_PATH: &str = "wireframe.wgsl";
 const BUFFER_LEN: usize = 16;
 
 mod lod;
@@ -38,13 +43,25 @@ pub struct EventTimer {
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    present_mode: bevy::window::PresentMode::AutoNoVsync,
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        present_mode: bevy::window::PresentMode::AutoNoVsync,
+                        ..Default::default()
+                    }),
+
                     ..Default::default()
+                })
+                .set(RenderPlugin {
+                    render_creation: RenderCreation::Automatic(WgpuSettings {
+                        // WARN this is a native only feature. It will not work with webgl or webgpu
+                        features: WgpuFeatures::POLYGON_MODE_LINE,
+                        ..default()
+                    }),
+                    ..default()
                 }),
-                ..Default::default()
-            }),
+            // You need to add this plugin to enable wireframe rendering
+            // WireframePlugin::default(),
             FpsOverlayPlugin {
                 config: FpsOverlayConfig {
                     text_config: TextFont {
@@ -60,6 +77,7 @@ fn main() {
                 },
             },
             MaterialPlugin::<ExtendedMaterial<StandardMaterial, CustomMaterial>>::default(),
+            MaterialPlugin::<ExtendedMaterial<StandardMaterial, WireframeMaterial>>::default(),
             GpuReadbackPlugin,
             ExtractResourcePlugin::<HeightBuffer>::default(),
             ExtractResourcePlugin::<NormalBuffer>::default(),
@@ -72,10 +90,19 @@ fn main() {
             // field1: Timer::from_seconds(1.0, TimerMode::Repeating),
             field1: Timer::from_seconds(0.05, TimerMode::Repeating),
         })
+        // .insert_resource(WireframeConfig {
+        //     // The global wireframe config enables drawing of wireframes on every mesh,
+        //     // except those with `NoWireframe`. Meshes with `Wireframe` will always have a wireframe,
+        //     // regardless of the global configuration.
+        //     global: true,
+        //     // Controls the default color of all wireframes. Used as the default color for global wireframes.
+        //     // Can be changed per mesh using the `WireframeColor` component.
+        //     default_color: WHITE.into(),
+        // })
         .add_systems(Startup, setup)
         // .add_systems(Startup, setup_compute)
         .add_systems(Update, move_player)
-        // .add_systems(Update, update_mesh)
+        // .add_systems(Update, toggle_wireframe)
         .add_systems(Update, compute_on_input)
         .add_systems(Startup, setup_camera)
         .add_systems(Startup, setup_mock_camera)
@@ -352,6 +379,19 @@ impl PatchState {
         }
     }
 }
+#[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
+struct WireframeMaterial {
+    #[storage(100, read_only)]
+    // #[texture(100)]
+    // #[sampler(101)]
+    heightmap: Handle<ShaderStorageBuffer>,
+    #[uniform(101)]
+    level: PatchState,
+    #[storage(110, read_only)]
+    normals: Handle<ShaderStorageBuffer>,
+    #[storage(111, read_only)]
+    tangents: Handle<ShaderStorageBuffer>,
+}
 
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
 struct CustomMaterial {
@@ -390,8 +430,29 @@ impl MaterialExtension for CustomMaterial {
         TERRAIN_SHADER_PATH.into()
     }
 }
+impl MaterialExtension for WireframeMaterial {
+    fn vertex_shader() -> ShaderRef {
+        WIREFRAME_SHADER_PATH.into()
+    }
+
+    fn fragment_shader() -> ShaderRef {
+        WIREFRAME_SHADER_PATH.into()
+    }
+    fn deferred_fragment_shader() -> ShaderRef {
+        WIREFRAME_SHADER_PATH.into()
+    }
+    fn specialize(
+        pipeline: &bevy::pbr::MaterialExtensionPipeline,
+        descriptor: &mut RenderPipelineDescriptor,
+        layout: &bevy::render::mesh::MeshVertexBufferLayoutRef,
+        key: bevy::pbr::MaterialExtensionKey<Self>,
+    ) -> std::result::Result<(), SpecializedMeshPipelineError> {
+        descriptor.primitive.polygon_mode = PolygonMode::Line;
+        Ok(())
+    }
+}
 const TREE_DEPTH: usize = 5;
-const RANGE_MIN_DIS: f32 = 20.0;
+const RANGE_MIN_DIS: f32 = 60.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
 
@@ -558,6 +619,7 @@ fn setup_camera(mut commands: Commands) {
             Player,
             Transform::from_xyz(4., 30.0, 100.0),
             Visibility::default(),
+            NotShadowCaster,
         ))
         .with_children(|parent| {
             // parent.spawn((WorldModelCamera,));
@@ -617,4 +679,14 @@ fn setup_camera(mut commands: Commands) {
     //         Vec3::Y,
     //     ),
     // ));
+}
+
+fn toggle_wireframe(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut config: ResMut<WireframeConfig>,
+) {
+    // Toggle showing a wireframe on all meshes
+    if keyboard_input.just_pressed(KeyCode::KeyP) {
+        config.global = !config.global;
+    }
 }
