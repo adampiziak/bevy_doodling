@@ -74,10 +74,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let map_center = vec2f(300.0, 300.0);
     var x = vertex.position[0]*patch_state.side_length + patch_state.offset_x;
     var z = vertex.position[2]*patch_state.side_length + patch_state.offset_y;
-    var partial = false;
-    if patch_state.partial == 1u {
-        partial = true;
-    }
+    var partial = patch_state.partial == 1u;
 
     //CDLOD morph
     var vpos = vec3f(x, 0.0, z);
@@ -158,9 +155,9 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     // out.color = vertex.color;
     // out.color = vec4f(0.0, 0.0, factor, 1.0);
     var lc = 0.0;
-    // if patch_state.level == 0u {
-    //     lc = 0.3;
-    // }
+    if patch_state.level == 0u {
+        lc = 0.8;
+    }
     var pc = 0.0;
     if patch_state.partial == 1u {
         pc = 0.3;

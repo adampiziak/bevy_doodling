@@ -129,7 +129,8 @@ impl MeshNode {
 }
 
 const PATCH_WIDTH: usize = 40;
-const PARTIAL_PATCH_SIZE: usize = 10;
+const WHOLE_PATCH_SIZE: usize = 11;
+const PARTIAL_PATCH_SIZE: usize = 6;
 fn patch_coord2index(x: usize, z: usize, patch_size: usize) -> usize {
     z * patch_size + x
 }
@@ -140,14 +141,13 @@ fn patch_index2coord(index: usize, patch_size: usize) -> (usize, usize) {
     (x, z)
 }
 
-fn create_patch_mesh(side_vertex_count: usize) -> Mesh {
-    let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; side_vertex_count * side_vertex_count];
+fn create_patch_mesh(length: usize) -> Mesh {
+    let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; length * length];
     let mut uvs: Vec<[f32; 2]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
-    let side_size = side_vertex_count - 1;
 
-    for i in 0..side_vertex_count * side_vertex_count {
-        let (x, z) = patch_index2coord(i, side_vertex_count);
+    for i in 0..length * length {
+        let (x, z) = patch_index2coord(i, length);
         positions[i as usize] = [x as f32, 5.0, z as f32];
         uvs.push([x as f32, z as f32]);
     }
@@ -159,12 +159,12 @@ fn create_patch_mesh(side_vertex_count: usize) -> Mesh {
     // |    \   |  etc...
     // |       \|
     // * ------ * -------
-    for row in 0..(side_vertex_count - 1) {
-        for col in 0..(side_vertex_count - 1) {
-            let top_left = patch_coord2index(row + 1, col, side_vertex_count) as u32;
-            let top_right = patch_coord2index(row + 1, col + 1, side_vertex_count) as u32;
-            let bottom_left = patch_coord2index(row, col, side_vertex_count) as u32;
-            let bottom_right = patch_coord2index(row, col + 1, side_vertex_count) as u32;
+    for row in 0..(length - 1) {
+        for col in 0..(length - 1) {
+            let top_left = patch_coord2index(row + 1, col, length) as u32;
+            let top_right = patch_coord2index(row + 1, col + 1, length) as u32;
+            let bottom_left = patch_coord2index(row, col, length) as u32;
+            let bottom_right = patch_coord2index(row, col + 1, length) as u32;
             let mut triangle1 = vec![top_left, bottom_left, bottom_right];
             // triangle1.reverse();
             let mut triangle2 = vec![top_left, bottom_right, top_right];
@@ -343,8 +343,8 @@ pub fn render_lod(
     // let hm_handle = texture_buffer.0.clone();
     // println!("SPAWN {frame_id}");
     PatchState::assert_uniform_compat();
-    let whole_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE * 2);
-    let partial_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE + 1);
+    let whole_patch_mesh = create_patch_mesh(WHOLE_PATCH_SIZE);
+    let partial_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE);
     let whole_mesh_handle = meshes.add(whole_patch_mesh);
     let partial_mesh_handle = meshes.add(partial_patch_mesh);
     let mut partial_ran = false;
@@ -587,7 +587,7 @@ fn select_lod2(
 fn get_side_length(level: usize) -> f32 {
     let side_length = MAP_WIDTH as f32
         / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32)
-        / (PARTIAL_PATCH_SIZE * 2 - 1) as f32;
+        / (WHOLE_PATCH_SIZE - 1) as f32;
     side_length
 }
 
