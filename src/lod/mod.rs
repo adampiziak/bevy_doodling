@@ -10,7 +10,7 @@ use bevy::{
     image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
     math::{
         Dir3, Vec2, Vec3,
-        bounding::{Aabb3d, BoundingSphere, IntersectsVolume},
+        bounding::{Aabb3d, BoundingSphere, BoundingVolume, IntersectsVolume},
         primitives::Cuboid,
     },
     pbr::{ExtendedMaterial, NotShadowCaster},
@@ -42,6 +42,20 @@ impl MeshNode2 {
             level,
             partial,
         }
+    }
+
+    fn children(&self) -> Vec<MeshNode2> {
+        let mut children = Vec::new();
+        let cen = self.boundry.center();
+        let min = self.boundry.min;
+        let max = self.boundry.max;
+
+        let min_x = (min.x + cen.x) / 2.0;
+        let max_x = (max.x + cen.x) / 2.0;
+        let min_y = (min.y + cen.y) / 2.0;
+        let max_y = (max.y + cen.y) / 2.0;
+
+        children
     }
 }
 
@@ -245,7 +259,7 @@ pub fn render_lod(
     // let mut patches = Vec::new();
     let mut patches2 = Vec::new();
     // select_lod(&node, &mut patches, TREE_DEPTH - 1, &bounding_spheres);
-    select_lod2(node2, TREE_DEPTH, &bounding_spheres, &mut patches);
+    select_lod2(node2, TREE_DEPTH - 1, &bounding_spheres, &mut patches2);
 
     // remove previous patches
     // println!("NUM PATCHES: {}", patches.len());
@@ -404,18 +418,55 @@ impl QuadTree {
     }
 }
 
+struct Patch {
+    boundry: Aabb3d,
+    level: usize,
+    partial: bool,
+}
+
+impl Patch {
+    fn new(boundry: Aabb3d, level: usize, partial: bool) -> Self {
+        Self {
+            boundry,
+            level,
+            partial,
+        }
+    }
+}
+
 fn select_lod2(
     node: MeshNode2,
     level: usize,
     ranges: &Vec<BoundingSphere>,
-    patches: &mut Vec<MeshNode2>,
+    patches: &mut Vec<Patch>,
 ) -> bool {
-    let lodBoundry = ranges[level];
-    if !node.boundry.intersects(&lodBoundry) {}
+    let lod_boundry = ranges[level];
+
+    // If we are not within the range of the current level,
+    // then skip node
+    if !node.boundry.intersects(&lod_boundry) {
+        return false;
+    }
+
+    // At this point, we are within the current LOD range
+    // Always add the highest detail LOD (0)
     if level == 0 {
-        patches.push(node);
+        patches.push(Patch::new(node.boundry, 0, false));
         return true;
     }
+
+    // We are not at the highest detail,
+    // If the next LOD range doesn't intersect this node, then add
+    // the whole node
+    let next_lod_boundry = ranges[level - 1];
+    if !node.boundry.intersects(&next_lod_boundry) {
+        patches.push(Patch::new(node.boundry, level, false));
+    }
+
+    // The next LOD range DOES intersect this node
+    // We need to check to see which child nodes
+    // are within the next node
+
     true
 }
 
