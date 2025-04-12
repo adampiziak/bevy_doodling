@@ -35,6 +35,7 @@ struct PatchState {
     ranges: array<vec4f, 16>,
     tree_depth: u32,
     side_length: f32
+    patch_size: f32,
 }
 // @group(2) @binding(100) var tex: texture_2d<f32>;
 // @group(2) @binding(101) var tex_sampler: sampler;

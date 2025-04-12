@@ -33,6 +33,7 @@ struct PatchState {
     ranges: array<vec4f, 16>,
     tree_depth: u32,
     side_length: f32,
+    patch_size: f32,
 }
 @group(2) @binding(101) var<uniform> patch_state: PatchState;
 struct Vertex {

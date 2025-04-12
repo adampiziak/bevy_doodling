@@ -252,6 +252,7 @@ pub fn render_lod(
         let side_length = MAP_WIDTH as f32
             / 2.0_f32.powf((TREE_DEPTH - patch.level - 1) as f32)
             / (PATCH_HEIGHT - 1) as f32;
+        let patch_size = side_length * (PATCH_HEIGHT - 1) as f32;
         let patch_state = PatchState::new(
             // pl as u32,
             patch.level as u32,
@@ -261,6 +262,7 @@ pub fn render_lod(
             &ranges,
             TREE_DEPTH as u32,
             side_length,
+            patch_size,
         );
         let cust_mat = ExtendedMaterial {
             base: StandardMaterial {
