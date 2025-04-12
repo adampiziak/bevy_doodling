@@ -124,20 +124,74 @@ impl MeshNode {
 }
 
 const PATCH_WIDTH: usize = 40;
-const PATCH_HEIGHT: usize = 20;
+const PARTIAL_PATCH_SIZE: usize = 20;
 fn patch_coord2index(x: usize, z: usize) -> usize {
-    z * PATCH_HEIGHT + x
+    z * PARTIAL_PATCH_SIZE + x
 }
 
 fn patch_index2coord(index: usize) -> (usize, usize) {
-    let x = index % PATCH_HEIGHT;
-    let z = index / PATCH_HEIGHT;
+    let x = index % PARTIAL_PATCH_SIZE;
+    let z = index / PARTIAL_PATCH_SIZE;
     (x, z)
 }
 
+fn create_patch_mesh(size: usize) -> Mesh {
+    let node_height = size;
+    let node_width = node_height;
+    let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; node_width * node_height];
+    let mut uvs: Vec<[f32; 2]> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    // let level = 0;
+    // let side_length =
+    //     MAP_WIDTH as f32 / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32) / (node_width - 1) as f32;
+    let side_length = 1.0;
+
+    // let mut rng = rng();
+    for i in 0..node_width * node_height {
+        let (x, z) = patch_index2coord(i);
+        let xoffset = x as f32 * side_length;
+        let zoffset = z as f32 * side_length;
+        positions[i as usize] = [xoffset, 5.0, zoffset];
+        uvs.push([xoffset, zoffset]);
+    }
+
+    // create triangles
+    // go throw each row of mesh, and create triangles for row
+    // * ------ * -------
+    // | \      |
+    // |    \   |  etc...
+    // |       \|
+    // * ------ * -------
+    for row in 0..(node_height - 1) {
+        for col in 0..(node_width - 1) {
+            let top_left = patch_coord2index(row + 1, col) as u32;
+            let top_right = patch_coord2index(row + 1, col + 1) as u32;
+            let bottom_left = patch_coord2index(row, col) as u32;
+            let bottom_right = patch_coord2index(row, col + 1) as u32;
+            let mut triangle1 = vec![top_left, bottom_left, bottom_right];
+            // triangle1.reverse();
+            let mut triangle2 = vec![top_left, bottom_right, top_right];
+            // triangle2.reverse();
+            indices.append(&mut triangle1);
+            indices.append(&mut triangle2);
+        }
+    }
+
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
+
+    let plen = positions.len();
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh.insert_indices(Indices::U32(indices));
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vec![[0.0; 4]; plen]);
+    mesh.compute_normals();
+    mesh.generate_tangents().unwrap();
+
+    mesh
+}
 // Mesh for smallest patch
 fn create_terrain_mesh_node(level: usize) -> Mesh {
-    let node_height = PATCH_HEIGHT;
+    let node_height = PARTIAL_PATCH_SIZE;
     let node_width = node_height;
     let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; node_width * node_height];
     let mut uvs: Vec<[f32; 2]> = Vec::new();
@@ -257,7 +311,7 @@ pub fn render_lod(
     let camera_center = transform.translation.xz();
     println!("CAMERA {:?}", camera_center);
     let bwidth = MAP_WIDTH as f32;
-    let largest_patch_size = PATCH_HEIGHT as f32 * 2.0_f32.powf(TREE_DEPTH as f32 - 1.0);
+    let largest_patch_size = PARTIAL_PATCH_SIZE as f32 * 2.0_f32.powf(TREE_DEPTH as f32 - 1.0);
     // let bwidth = largest_patch_size;
     let map_boundry = Aabb3d::new(
         Vec3::new(0.0, 0.0, 0.0),
@@ -275,7 +329,7 @@ pub fn render_lod(
     // let mut patches = Vec::new();
     let mut patches2 = Vec::new();
     // select_lod(&node, &mut patches, TREE_DEPTH - 1, &bounding_spheres);
-    select_lod2(node2, TREE_DEPTH - 1, &bounding_spheres, &mut patches2);
+    select_lod2(&node2, TREE_DEPTH - 1, &bounding_spheres, &mut patches2);
 
     // remove previous patches
     // println!("NUM PATCHES: {}", patches.len());
@@ -291,16 +345,18 @@ pub fn render_lod(
     // let hm_handle = texture_buffer.0.clone();
     // println!("SPAWN {frame_id}");
     PatchState::assert_uniform_compat();
-    for patch in patches {
-        let side_length = MAP_WIDTH as f32
-            / 2.0_f32.powf((TREE_DEPTH - patch.level - 1) as f32)
-            / (PATCH_HEIGHT - 1) as f32;
-        let patch_size = side_length * (PATCH_HEIGHT - 1) as f32;
+    let whole_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE * 2);
+    let partial_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE);
+    let whole_mesh_handle = meshes.add(whole_patch_mesh);
+    let partial_mesh_handle = meshes.add(partial_patch_mesh);
+    for patch in patches2 {
+        let side_length = get_side_length(patch.level);
+        let patch_size = side_length * (PARTIAL_PATCH_SIZE - 1) as f32;
         let patch_state = PatchState::new(
             // pl as u32,
             patch.level as u32,
-            patch.center.x,
-            patch.center.y,
+            patch.boundry.center().x,
+            patch.boundry.center().z,
             transform.translation.to_array(),
             &ranges,
             TREE_DEPTH as u32,
@@ -392,7 +448,12 @@ pub fn render_lod(
         };
 
         let mat_handle = custom_materials.add(cust_mat);
-        let mesh_handle = patch_meshes[patch.level].clone();
+        // let mesh_handle = patch_meshes[patch.level].clone();
+        let mesh_handle = if patch.partial {
+            whole_mesh_handle.clone()
+        } else {
+            partial_mesh_handle.clone()
+        };
         let wire_handle = wire_materials.add(wire_mat);
         commands.spawn((
             Mesh3d(mesh_handle.clone()),
@@ -450,8 +511,10 @@ impl Patch {
     }
 }
 
+// false, not handled
+// true, handled
 fn select_lod2(
-    node: MeshNode2,
+    node: &MeshNode2,
     level: usize,
     ranges: &Vec<BoundingSphere>,
     patches: &mut Vec<Patch>,
@@ -483,7 +546,21 @@ fn select_lod2(
     // We need to check to see which child nodes
     // are within the next node
 
+    for child in node.children() {
+        if !select_lod2(&child, level - 1, ranges, patches) {
+            // Child node not within next range, add part of current node
+            patches.push(Patch::new(child.boundry, level, true)); // true -> partial node
+        }
+    }
+
     true
+}
+
+fn get_side_length(level: usize) -> f32 {
+    let side_length = MAP_WIDTH as f32
+        / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32)
+        / (PARTIAL_PATCH_SIZE * 2 - 1) as f32;
+    side_length
 }
 
 fn select_lod(
