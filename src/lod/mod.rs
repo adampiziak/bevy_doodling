@@ -309,29 +309,19 @@ pub fn render_lod(
 
     let camera_center = transform.translation.xz();
     println!("CAMERA {:?}", camera_center);
-    let bwidth = MAP_WIDTH as f32;
-    let largest_patch_size = PARTIAL_PATCH_SIZE as f32 * 2.0_f32.powf(TREE_DEPTH as f32 - 1.0);
-    // let bwidth = largest_patch_size;
     let map_boundry = Aabb3d::new(
         Vec3::new(0.0, 0.0, 0.0),
         Vec3::new(MAP_WIDTH as f32 / 2.0, 0.0, MAP_HEIGHT as f32 / 2.0),
     );
 
-    let node = MeshNode::new(
-        Vec2::new(0.0, 0.0),
-        TREE_DEPTH - 1,
-        Vec3::new(bwidth / 2.0, 1.0, bwidth / 2.0),
-    );
+    // Root node encompasses entire map
+    let root_node = MeshNode2::new(map_boundry, TREE_DEPTH - 1, false);
 
-    let node2 = MeshNode2::new(map_boundry, TREE_DEPTH - 1, false);
-
-    // let mut patches = Vec::new();
-    let mut patches2 = Vec::new();
-    // select_lod(&node, &mut patches, TREE_DEPTH - 1, &bounding_spheres);
-    select_lod2(&node2, TREE_DEPTH - 1, &bounding_spheres, &mut patches2);
+    let mut patches = Vec::new();
+    select_lod2(&root_node, TREE_DEPTH - 1, &bounding_spheres, &mut patches);
 
     // remove previous patches
-    println!("NUM PATCHES: {}", patches2.len());
+    println!("NUM PATCHES: {}", patches.len());
 
     // let mut patch_meshes = Vec::new();
 
@@ -345,11 +335,8 @@ pub fn render_lod(
     // println!("SPAWN {frame_id}");
     PatchState::assert_uniform_compat();
     let patch_mesh = create_patch_mesh(PATCH_RESOLUTION);
-    let partial_patch_mesh = create_patch_mesh(PARTIAL_PATCH_SIZE);
-    let whole_mesh_handle = meshes.add(patch_mesh);
-    let partial_mesh_handle = meshes.add(partial_patch_mesh);
-    let mut partial_ran = false;
-    for patch in patches2 {
+    let mesh_handle = meshes.add(patch_mesh);
+    for patch in patches {
         // if patch.partial {
         //     if partial_ran {
         //         continue;
@@ -487,7 +474,7 @@ pub fn render_lod(
             PatchLabel(frame_id),
         ));
         commands.spawn((
-            Mesh3d(mesh_handle),
+            Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(wire_handle),
             NoFrustumCulling,
             // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
@@ -554,7 +541,9 @@ fn select_lod2(
     // At this point, we are within the current LOD range
     // Always add the highest detail LOD (0)
     if level == 0 {
-        patches.push(Patch::new(node.boundry, 0, false));
+        for child in node.children() {
+            patches.push(Patch::new(child.boundry, level, false));
+        }
         return true;
     }
 
@@ -563,7 +552,9 @@ fn select_lod2(
     // the whole node
     let next_lod_boundry = ranges[level - 1];
     if !node.boundry.intersects(&next_lod_boundry) {
-        patches.push(Patch::new(node.boundry, level, false));
+        for child in node.children() {
+            patches.push(Patch::new(child.boundry, level, false));
+        }
     }
     // The next LOD range DOES intersect this node
     // We need to check to see which child nodes
