@@ -249,16 +249,19 @@ fn create_terrain_mesh_node(level: usize) -> Mesh {
 #[derive(Component)]
 pub struct PatchLabel(u32);
 
+#[derive(Resource, Default)]
+pub struct CdlodMaterials {
+    materials: Vec<Handle<ExtendedMaterial<StandardMaterial, WireframeMaterial>>>,
+}
+
 pub fn render_lod(
     mut commands: Commands,
     mock_camera: Query<&Transform, With<MockCamera>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
-
     buffer: Res<HeightBuffer>,
     normal_buffer: Res<NormalBuffer>,
     tangent_buffer: Res<TangentBuffer>,
-    // texture_buffer: Res<HeightMapTexture>,
+    mut cdlod_state: ResMut<CdlodMaterials>,
     mesh_query: Query<(Entity, &PatchLabel)>,
     time: Res<Time>,
     mut gizmos: Gizmos,
@@ -273,6 +276,14 @@ pub fn render_lod(
 
     timer.field1.tick(time.delta());
     if !timer.field1.just_finished() {
+        // update camera pos and skip
+        let p = transform.translation;
+        let cp = Vec4::from((p, 1.0));
+        for handle in &cdlod_state.materials {
+            if let Some(mat) = wire_materials.get_mut(handle) {
+                mat.extension.level.camera_pos = cp;
+            }
+        }
         return;
     }
     let mut rng = rng();
@@ -283,6 +294,7 @@ pub fn render_lod(
             commands.entity(entity).despawn();
         }
     }
+    cdlod_state.materials.clear();
 
     let mut ranges = Vec::new();
     for i in 0..TREE_DEPTH {
@@ -299,15 +311,15 @@ pub fn render_lod(
     ];
 
     let mut ri = 0;
-    gizmos.rect(
-        Isometry3d::new(Vec3::new(0.0, 2.0, 0.0), Quat::from_rotation_x(PI / 2.)),
-        Vec2::new(MAP_WIDTH as f32, MAP_HEIGHT as f32),
-        Color::WHITE,
-    );
+    // gizmos.rect(
+    //     Isometry3d::new(Vec3::new(0.0, 2.0, 0.0), Quat::from_rotation_x(PI / 2.)),
+    //     Vec2::new(MAP_WIDTH as f32, MAP_HEIGHT as f32),
+    //     Color::WHITE,
+    // );
     for r in &ranges {
         // let sphere = Sphere::new(r);
         let bsphere = BoundingSphere::new(transform.translation, *r);
-        gizmos.sphere(transform.translation, *r, colors[ri]);
+        // gizmos.sphere(transform.translation, *r, colors[ri]);
         bounding_spheres.push(bsphere);
         ri += 1;
     }
@@ -365,12 +377,12 @@ pub fn render_lod(
         if patch.partial {
             ssize = 5.0;
         }
-        gizmos.sphere(gcen, ssize, colors[patch.level]);
-        gizmos.rect(
-            Isometry3d::new(patch.boundry.center(), Quat::from_rotation_x(PI / 2.)),
-            patch.boundry.half_size().xz() * 2.0,
-            SALMON,
-        );
+        // gizmos.sphere(gcen, ssize, colors[patch.level]);
+        // gizmos.rect(
+        //     Isometry3d::new(patch.boundry.center(), Quat::from_rotation_x(PI / 2.)),
+        //     patch.boundry.half_size().xz() * 2.0,
+        //     SALMON,
+        // );
         let partial_flag = if patch.partial { 1 } else { 0 };
         let partial_flag = 0;
         let patch_state = PatchState::new(
@@ -472,6 +484,7 @@ pub fn render_lod(
         let mat_handle = custom_materials.add(cust_mat);
         // let mesh_handle = patch_meshes[patch.level].clone();
         let wire_handle = wire_materials.add(wire_mat);
+        cdlod_state.materials.push(wire_handle.clone());
         commands.spawn((
             Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(mat_handle.clone()),

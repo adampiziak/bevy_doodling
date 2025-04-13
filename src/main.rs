@@ -26,7 +26,7 @@ use bevy::{
     },
     text::FontSmoothing,
 };
-use lod::{move_mock_camera, render_lod, setup_mock_camera};
+use lod::{CdlodMaterials, move_mock_camera, render_lod, setup_mock_camera};
 use rand::{Rng, distr::uniform, rng};
 
 const COMPUTE_SHADER_ASSET_PATH: &str = "compute.wgsl";
@@ -86,10 +86,11 @@ fn main() {
             // ExtractResourcePlugin::<ReadbackImage>::default(),
             ExtractResourcePlugin::<TerrainState>::default(),
         ))
+        .insert_resource(CdlodMaterials::default())
         .insert_resource(EventTimer {
-            // field1: Timer::from_seconds(1.0, TimerMode::Repeating),
-            field1: Timer::from_seconds(0.14, TimerMode::Repeating),
-            // field1: Timer::from_seconds(0.05, TimerMode::Repeating),
+            // field1: Timer::from_seconds(0.2, TimerMode::Repeating),
+            // field1: Timer::from_seconds(0.14, TimerMode::Repeating),
+            field1: Timer::from_seconds(0.05, TimerMode::Repeating),
         })
         // .insert_resource(WireframeConfig {
         //     // The global wireframe config enables drawing of wireframes on every mesh,

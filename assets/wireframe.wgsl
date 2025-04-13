@@ -157,9 +157,9 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     // out.color = vec4f(0.0, 0.0, factor, 1.0);
     let base = 0.4;
     var lc = base;
-    if patch_state.level == 0u {
-        lc = 0.8;
-    }
+    // if patch_state.level == 0u {
+    //     lc = 0.8;
+    // }
     var pc = base;
     if patch_state.partial == 1u {
         pc = 0.8;
