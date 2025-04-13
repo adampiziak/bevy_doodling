@@ -112,7 +112,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
 
     
-    vertex.position = vec3f(x, height + 2.0, z);
+    vertex.position = vec3f(x, height + 0.8, z);
     // vertex.position = vec3f(mvertex.x, vpos.y, mvertex.y);
     var out: VertexOutput;
 
@@ -155,7 +155,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 #ifdef VERTEX_COLORS
     // out.color = vertex.color;
     // out.color = vec4f(0.0, 0.0, factor, 1.0);
-    let base = 0.4;
+    let base = 0.2;
     var lc = base;
     // if patch_state.level == 0u {
     //     lc = 0.8;
@@ -165,7 +165,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
         pc = 0.8;
     }
     // let morph2 = frc*morph_val;
-    out.color = vec4f(base, pc, lc, 1.0);
+    out.color = vec4f(base, pc + 0.05, lc + 0.2, 1.0);
 #endif
 
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX

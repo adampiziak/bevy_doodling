@@ -26,7 +26,7 @@ use bevy::{
     },
     text::FontSmoothing,
 };
-use lod::{CdlodMaterials, move_mock_camera, render_lod, setup_mock_camera};
+use lod::{CdlodMaterials, EnableWireframe, move_mock_camera, render_lod, setup_mock_camera};
 use rand::{Rng, distr::uniform, rng};
 
 const COMPUTE_SHADER_ASSET_PATH: &str = "compute.wgsl";
@@ -87,6 +87,7 @@ fn main() {
             ExtractResourcePlugin::<TerrainState>::default(),
         ))
         .insert_resource(CdlodMaterials::default())
+        .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
             // field1: Timer::from_seconds(0.2, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.14, TimerMode::Repeating),
@@ -480,8 +481,8 @@ impl MaterialExtension for WireframeMaterial {
         Ok(())
     }
 }
-const TREE_DEPTH: usize = 3;
-const RANGE_MIN_DIS: f32 = 400.0;
+const TREE_DEPTH: usize = 4;
+const RANGE_MIN_DIS: f32 = 300.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
 
@@ -637,7 +638,7 @@ fn setup_camera(mut commands: Commands) {
         Transform::from_xyz(0.0, 300.0, 0.0).looking_to(
             Vec3 {
                 x: -0.2,
-                y: -0.12,
+                y: -0.13,
                 z: 0.2,
             },
             Vec3::Y,

@@ -13,7 +13,7 @@ use bevy::{
         bounding::{Aabb3d, BoundingSphere, BoundingVolume, IntersectsVolume},
         primitives::Cuboid,
     },
-    pbr::{ExtendedMaterial, NotShadowCaster},
+    pbr::{ExtendedMaterial, NotShadowCaster, TransmittedShadowReceiver},
     prelude::*,
     render::{
         mesh::{Indices, Mesh, Mesh3d, MeshBuilder, PlaneMeshBuilder, PrimitiveTopology},
@@ -133,7 +133,7 @@ impl MeshNode {
     }
 }
 
-const PATCH_RESOLUTION: usize = 17;
+const PATCH_RESOLUTION: usize = 5;
 fn patch_coord2index(x: usize, z: usize, patch_size: usize) -> usize {
     z * patch_size + x
 }
@@ -250,6 +250,8 @@ pub struct PatchLabel(u32);
 pub struct CdlodMaterials {
     materials: Vec<Handle<ExtendedMaterial<StandardMaterial, WireframeMaterial>>>,
 }
+#[derive(Resource, Default)]
+pub struct EnableWireframe(bool);
 
 pub fn render_lod(
     mut commands: Commands,
@@ -258,9 +260,11 @@ pub fn render_lod(
     buffer: Res<HeightBuffer>,
     normal_buffer: Res<NormalBuffer>,
     tangent_buffer: Res<TangentBuffer>,
+    input: Res<ButtonInput<KeyCode>>,
     mut cdlod_state: ResMut<CdlodMaterials>,
     mesh_query: Query<(Entity, &PatchLabel)>,
     time: Res<Time>,
+    mut enable_wireframe: ResMut<EnableWireframe>,
     mut gizmos: Gizmos,
     mut timer: ResMut<EventTimer>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -270,6 +274,10 @@ pub fn render_lod(
     let Ok(transform) = mock_camera.single() else {
         return;
     };
+
+    if input.just_pressed(KeyCode::KeyU) {
+        enable_wireframe.0 = !enable_wireframe.0;
+    }
 
     timer.field1.tick(time.delta());
     if !timer.field1.just_finished() {
@@ -397,7 +405,7 @@ pub fn render_lod(
         );
         let cust_mat = ExtendedMaterial {
             base: StandardMaterial {
-                perceptual_roughness: 0.8,
+                perceptual_roughness: 0.9,
                 ..Default::default()
             },
             extension: CustomMaterial {
@@ -487,16 +495,20 @@ pub fn render_lod(
             Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(mat_handle.clone()),
             NoFrustumCulling,
+            TransmittedShadowReceiver,
             // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
             PatchLabel(frame_id),
         ));
-        commands.spawn((
-            Mesh3d(mesh_handle.clone()),
-            MeshMaterial3d(wire_handle),
-            NoFrustumCulling,
-            // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
-            PatchLabel(frame_id),
-        ));
+
+        if enable_wireframe.0 {
+            commands.spawn((
+                Mesh3d(mesh_handle.clone()),
+                MeshMaterial3d(wire_handle),
+                NoFrustumCulling,
+                // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
+                PatchLabel(frame_id),
+            ));
+        }
     }
 }
 
