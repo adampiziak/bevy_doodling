@@ -113,7 +113,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let high = patch_state.ranges[vi].x;
     let delta = high - low;
     let factor = (dis - low) / delta;
-    let morph_val = smoothstep(0.7, 1.0, factor);
+    let morph_val = smoothstep(0.82, 1.0, factor);
     let frc: vec2f = fract(vertex.position.xz * 0.5)*2.0;
     var mvertex = vpos.xz;
     let mval = frc*morph_val*sl;

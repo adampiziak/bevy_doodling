@@ -133,8 +133,7 @@ impl MeshNode {
     }
 }
 
-const PATCH_RESOLUTION: usize = 8;
-const PARTIAL_PATCH_SIZE: usize = 6;
+const PATCH_RESOLUTION: usize = 17;
 fn patch_coord2index(x: usize, z: usize, patch_size: usize) -> usize {
     z * patch_size + x
 }
@@ -146,14 +145,12 @@ fn patch_index2coord(index: usize, patch_size: usize) -> (usize, usize) {
 }
 
 fn create_patch_mesh(resolution: usize) -> Mesh {
-    // vertex count will be 1 more than resolution
-    let vertex_count = resolution + 1;
-    let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; vertex_count * vertex_count];
+    let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; resolution * resolution];
     let mut uvs: Vec<[f32; 2]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
 
-    for i in 0..vertex_count * vertex_count {
-        let (x, z) = patch_index2coord(i, vertex_count);
+    for i in 0..resolution * resolution {
+        let (x, z) = patch_index2coord(i, resolution);
         positions[i as usize] = [x as f32, 5.0, z as f32];
         uvs.push([x as f32, z as f32]);
     }
@@ -165,12 +162,12 @@ fn create_patch_mesh(resolution: usize) -> Mesh {
     // |    \   |  etc...
     // |       \|
     // * ------ * -------
-    for row in 0..(resolution) {
-        for col in 0..(resolution) {
-            let top_left = patch_coord2index(row + 1, col, vertex_count) as u32;
-            let top_right = patch_coord2index(row + 1, col + 1, vertex_count) as u32;
-            let bottom_left = patch_coord2index(row, col, vertex_count) as u32;
-            let bottom_right = patch_coord2index(row, col + 1, vertex_count) as u32;
+    for row in 0..(resolution - 1) {
+        for col in 0..(resolution - 1) {
+            let top_left = patch_coord2index(row + 1, col, resolution) as u32;
+            let top_right = patch_coord2index(row + 1, col + 1, resolution) as u32;
+            let bottom_left = patch_coord2index(row, col, resolution) as u32;
+            let bottom_right = patch_coord2index(row, col + 1, resolution) as u32;
             let mut triangle1 = vec![top_left, bottom_left, bottom_right];
             // triangle1.reverse();
             let mut triangle2 = vec![top_left, bottom_right, top_right];
@@ -276,6 +273,7 @@ pub fn render_lod(
 
     timer.field1.tick(time.delta());
     if !timer.field1.just_finished() {
+        return;
         // update camera pos and skip
         let p = transform.translation;
         let cp = Vec4::from((p, 1.0));
@@ -593,7 +591,7 @@ fn select_lod2(
 fn get_side_length(level: usize) -> f32 {
     let side_length = MAP_WIDTH as f32
         / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32)
-        / (PATCH_RESOLUTION) as f32;
+        / (PATCH_RESOLUTION - 1) as f32;
     side_length * 0.5
 }
 
@@ -664,7 +662,7 @@ pub fn move_mock_camera(
         return;
     };
 
-    let speed = 80.0;
+    let speed = 100.0;
     let translation = transform.translation;
 
     if input.pressed(KeyCode::ArrowUp) {
