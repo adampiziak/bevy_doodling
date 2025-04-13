@@ -88,7 +88,8 @@ fn main() {
         ))
         .insert_resource(EventTimer {
             // field1: Timer::from_seconds(1.0, TimerMode::Repeating),
-            field1: Timer::from_seconds(0.05, TimerMode::Repeating),
+            field1: Timer::from_seconds(0.14, TimerMode::Repeating),
+            // field1: Timer::from_seconds(0.05, TimerMode::Repeating),
         })
         // .insert_resource(WireframeConfig {
         //     // The global wireframe config enables drawing of wireframes on every mesh,
@@ -142,12 +143,12 @@ fn compute_on_input(
     query: Query<Option<&Readback>>,
 ) {
     // println!("TERRAIN STATE IS {:?}", terrain_state.stage);
-    // if input.pressed(KeyCode::KeyJ) && terrain_state.stage == TerrainStage::Idle {
-    //     terrain_state.stage = TerrainStage::Start;
-    // }
-    if terrain_state.stage == TerrainStage::Idle {
+    if input.pressed(KeyCode::KeyJ) && terrain_state.stage == TerrainStage::Idle {
         terrain_state.stage = TerrainStage::Start;
     }
+    // if terrain_state.stage == TerrainStage::Idle {
+    //     terrain_state.stage = TerrainStage::Start;
+    // }
     // if terrain_state.stage == TerrainStage::Idle {
     //     for r in query {
     //         if let Some(ruw) = r {
@@ -479,7 +480,7 @@ impl MaterialExtension for WireframeMaterial {
     }
 }
 const TREE_DEPTH: usize = 5;
-const RANGE_MIN_DIS: f32 = 400.0;
+const RANGE_MIN_DIS: f32 = 100.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
 

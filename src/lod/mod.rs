@@ -71,10 +71,15 @@ impl MeshNode2 {
         let lower_left_boundry = Aabb3d::new(lower_left, half_size);
         let lower_right_boundry = Aabb3d::new(lower_right, half_size);
 
-        children.push(MeshNode2::new(upper_left_boundry, self.level - 1, false));
-        children.push(MeshNode2::new(upper_right_boundry, self.level - 1, false));
-        children.push(MeshNode2::new(lower_left_boundry, self.level - 1, false));
-        children.push(MeshNode2::new(lower_right_boundry, self.level - 1, false));
+        let mut child_level = self.level;
+        if child_level != 0 {
+            child_level -= 1;
+        }
+
+        children.push(MeshNode2::new(upper_left_boundry, child_level, false));
+        children.push(MeshNode2::new(upper_right_boundry, child_level, false));
+        children.push(MeshNode2::new(lower_left_boundry, child_level, false));
+        children.push(MeshNode2::new(lower_right_boundry, child_level, false));
 
         children
     }
@@ -128,7 +133,7 @@ impl MeshNode {
     }
 }
 
-const PATCH_RESOLUTION: usize = 16;
+const PATCH_RESOLUTION: usize = 8;
 const PARTIAL_PATCH_SIZE: usize = 6;
 fn patch_coord2index(x: usize, z: usize, patch_size: usize) -> usize {
     z * patch_size + x
@@ -266,10 +271,10 @@ pub fn render_lod(
         return;
     };
 
-    // timer.field1.tick(time.delta());
-    // if !timer.field1.just_finished() {
-    //     return;
-    // }
+    timer.field1.tick(time.delta());
+    if !timer.field1.just_finished() {
+        return;
+    }
     let mut rng = rng();
     let frame_id = rng.random_range(0_32..1000000);
     for (entity, label) in mesh_query.iter() {
@@ -344,7 +349,7 @@ pub fn render_lod(
         //         partial_ran = true;
         //     }
         // }
-        let mut side_length = get_side_length(patch.level);
+        let side_length = get_side_length(patch.level);
         // let partial_side_length = get_side_length(patch.level);
         // let patch_size = side_length * (8 * PARTIAL_PATCH_SIZE - 1) as f32;
         let patch_size = 0.0;
@@ -367,6 +372,7 @@ pub fn render_lod(
             SALMON,
         );
         let partial_flag = if patch.partial { 1 } else { 0 };
+        let partial_flag = 0;
         let patch_state = PatchState::new(
             // pl as u32,
             patch.level as u32,
@@ -574,8 +580,8 @@ fn select_lod2(
 fn get_side_length(level: usize) -> f32 {
     let side_length = MAP_WIDTH as f32
         / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32)
-        / (PATCH_RESOLUTION - 1) as f32;
-    side_length
+        / (PATCH_RESOLUTION) as f32;
+    side_length * 0.5
 }
 
 fn select_lod(
@@ -645,7 +651,7 @@ pub fn move_mock_camera(
         return;
     };
 
-    let speed = 150.0;
+    let speed = 80.0;
     let translation = transform.translation;
 
     if input.pressed(KeyCode::ArrowUp) {

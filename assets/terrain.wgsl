@@ -105,6 +105,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
     //CDLOD morph
     var vpos = vec3f(x, 0.0, z);
+    let sl = patch_state.side_length;
     let camera_pos = patch_state.camera_pos.xyz;
     let dis = distance(camera_pos.xz, vpos.xz);
     var low = 0.0;
@@ -112,10 +113,10 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let high = patch_state.ranges[vi].x;
     let delta = high - low;
     let factor = (dis - low) / delta;
-    let morph_val = clamp(factor/0.5  - 1.0, 0.0, 1.0);
+    let morph_val = smoothstep(0.7, 1.0, factor);
     let frc: vec2f = fract(vertex.position.xz * 0.5)*2.0;
     var mvertex = vpos.xz;
-    let mval = frc*morph_val*patch_state.side_length;
+    let mval = frc*morph_val*sl;
     // if partial {
     // mvertex -= mval;
         
@@ -138,7 +139,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
 
     
-    vertex.position = vec3f(x, height, z);
+    vertex.position = vec3f(x, height + 0.2, z);
     // vertex.position = vec3f(mvertex.x, vpos.y, mvertex.y);
     var out: VertexOutput;
 
