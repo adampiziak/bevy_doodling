@@ -133,7 +133,7 @@ impl MeshNode {
     }
 }
 
-const PATCH_RESOLUTION: usize = 5;
+const PATCH_SIZE: usize = 32;
 fn patch_coord2index(x: usize, z: usize, patch_size: usize) -> usize {
     z * patch_size + x
 }
@@ -144,7 +144,8 @@ fn patch_index2coord(index: usize, patch_size: usize) -> (usize, usize) {
     (x, z)
 }
 
-fn create_patch_mesh(resolution: usize) -> Mesh {
+fn create_patch_mesh(size: usize) -> Mesh {
+    let resolution = size + 1;
     let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; resolution * resolution];
     let mut uvs: Vec<[f32; 2]> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
@@ -189,60 +190,6 @@ fn create_patch_mesh(resolution: usize) -> Mesh {
 
     mesh
 }
-// Mesh for smallest patch
-/*
-fn create_terrain_mesh_node(level: usize) -> Mesh {
-    let node_height = PARTIAL_PATCH_SIZE;
-    let node_width = node_height;
-    let mut positions: Vec<[f32; 3]> = vec![[0.0; 3]; node_width * node_height];
-    let mut uvs: Vec<[f32; 2]> = Vec::new();
-    let mut indices: Vec<u32> = Vec::new();
-    let side_length =
-        MAP_WIDTH as f32 / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32) / (node_width - 1) as f32;
-
-    // let mut rng = rng();
-    for i in 0..node_width * node_height {
-        let (x, z) = patch_index2coord(i);
-        let xoffset = x as f32 * side_length;
-        let zoffset = z as f32 * side_length;
-        positions[i as usize] = [xoffset, 5.0, zoffset];
-        uvs.push([xoffset, zoffset]);
-    }
-
-    // create triangles
-    // go throw each row of mesh, and create triangles for row
-    // * ------ * -------
-    // | \      |
-    // |    \   |  etc...
-    // |       \|
-    // * ------ * -------
-    for row in 0..(node_height - 1) {
-        for col in 0..(node_width - 1) {
-            let top_left = patch_coord2index(row + 1, col) as u32;
-            let top_right = patch_coord2index(row + 1, col + 1) as u32;
-            let bottom_left = patch_coord2index(row, col) as u32;
-            let bottom_right = patch_coord2index(row, col + 1) as u32;
-            let mut triangle1 = vec![top_left, bottom_left, bottom_right];
-            // triangle1.reverse();
-            let mut triangle2 = vec![top_left, bottom_right, top_right];
-            // triangle2.reverse();
-            indices.append(&mut triangle1);
-            indices.append(&mut triangle2);
-        }
-    }
-
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
-
-    let plen = positions.len();
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-    mesh.insert_indices(Indices::U32(indices));
-    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vec![[0.0; 4]; plen]);
-    mesh.compute_normals();
-    mesh.generate_tangents().unwrap();
-
-    mesh
-}*/
 #[derive(Component)]
 pub struct PatchLabel(u32);
 
@@ -281,7 +228,7 @@ pub fn render_lod(
 
     timer.field1.tick(time.delta());
     if !timer.field1.just_finished() {
-        return;
+        // return;
         // update camera pos and skip
         let p = transform.translation;
         let cp = Vec4::from((p, 1.0));
@@ -294,12 +241,22 @@ pub fn render_lod(
     }
     let mut rng = rng();
     let frame_id = rng.random_range(0_32..1000000);
+    let count = mesh_query.iter().len();
+    let mat_count = custom_materials.len();
+    let wire_count = wire_materials.len();
+    println!("ENTITY COUNT {}", count);
+    println!("MAT COUNT {}", mat_count);
+    println!("wire COUNT {}", wire_count);
     for (entity, label) in mesh_query.iter() {
-        if label.0 != frame_id {
-            // println!("DESPAWN {}", label.0);
-            commands.entity(entity).despawn();
-        }
+        commands.entity(entity).despawn();
+        // if label.0 != frame_id {
+        //     // println!("DESPAWN {}", label.0);
+        //     commands.entity(entity).despawn();
+        // }
     }
+    // if count != 0 {
+    //     return;
+    // }
     cdlod_state.materials.clear();
 
     let mut ranges = Vec::new();
@@ -357,7 +314,7 @@ pub fn render_lod(
     // let hm_handle = texture_buffer.0.clone();
     // println!("SPAWN {frame_id}");
     PatchState::assert_uniform_compat();
-    let patch_mesh = create_patch_mesh(PATCH_RESOLUTION);
+    let patch_mesh = create_patch_mesh(PATCH_SIZE);
     let mesh_handle = meshes.add(patch_mesh);
     for patch in patches {
         // if patch.partial {
@@ -503,7 +460,7 @@ pub fn render_lod(
         if enable_wireframe.0 {
             commands.spawn((
                 Mesh3d(mesh_handle.clone()),
-                MeshMaterial3d(wire_handle),
+                MeshMaterial3d(wire_handle.clone()),
                 NoFrustumCulling,
                 // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
                 PatchLabel(frame_id),
@@ -601,9 +558,8 @@ fn select_lod2(
 }
 
 fn get_side_length(level: usize) -> f32 {
-    let side_length = MAP_WIDTH as f32
-        / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32)
-        / (PATCH_RESOLUTION - 1) as f32;
+    let side_length =
+        MAP_WIDTH as f32 / 2.0_f32.powf((TREE_DEPTH - level - 1) as f32) / (PATCH_SIZE) as f32;
     side_length * 0.5
 }
 
@@ -674,7 +630,7 @@ pub fn move_mock_camera(
         return;
     };
 
-    let speed = 100.0;
+    let speed = 200.0;
     let translation = transform.translation;
 
     if input.pressed(KeyCode::ArrowUp) {

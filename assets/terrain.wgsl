@@ -95,8 +95,6 @@ struct Vertex {
 @vertex
 fn vertex(vertex_in: Vertex) -> VertexOutput {
     var vertex = vertex_in;
-    let map_width = 600;
-    let map_height = 600u;
     let pl = patch_state.level;
     let map_center = vec2f(300.0, 300.0);
     var x = vertex.position[0]*patch_state.side_length + patch_state.offset_x;
@@ -127,11 +125,13 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     x = mvertex.x;
     z = mvertex.y;
 
+    let map_h = 1200.0;
     
-    let xi = x + 300.0;
-    let zi = z + 300.0;
+    let xi = x + map_h/2.0;
+    let zi = z + map_h/2.0;
+    
 
-    let i = u32(600.0*min(round(zi), 599.0) + min(round(xi), 599.0));
+    let i = u32(map_h*min(round(zi), map_h - 1.0) + min(round(xi), map_h - 1.0));
     let height: f32 = data[i];
 
     let computed_normal = normals[i];

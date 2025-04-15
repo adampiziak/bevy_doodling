@@ -111,7 +111,12 @@ fn main() {
         .add_systems(Startup, setup_mock_camera)
         .add_systems(Update, move_mock_camera)
         .add_systems(Update, render_lod)
+        .add_systems(Update, print_ent_count)
         .run();
+}
+
+pub fn print_ent_count(query: Query<Entity>) {
+    println!("MAIN ent COUNT: {}", query.iter().len());
 }
 
 #[derive(Resource, Default, ExtractResource, Clone)]
@@ -228,8 +233,9 @@ impl render_graph::Node for ComputeNode {
 
             pass.set_bind_group(0, &bind_group.0, &[]);
             pass.set_pipeline(init_pipeline);
-            let workgroup_x = (MAP_WIDTH + 7) / 8;
-            let workgroup_z = (MAP_HEIGHT + 7) / 8;
+            let workgroup_size = 16;
+            let workgroup_x = (MAP_WIDTH + workgroup_size - 1) / workgroup_size;
+            let workgroup_z = (MAP_HEIGHT + workgroup_size - 1) / workgroup_size;
             pass.dispatch_workgroups(workgroup_x as u32, 1, workgroup_z as u32);
         }
         Ok(())
@@ -481,10 +487,10 @@ impl MaterialExtension for WireframeMaterial {
         Ok(())
     }
 }
-const TREE_DEPTH: usize = 4;
-const RANGE_MIN_DIS: f32 = 300.0;
-const MAP_WIDTH: usize = 600;
-const MAP_HEIGHT: usize = 600;
+const TREE_DEPTH: usize = 3;
+const RANGE_MIN_DIS: f32 = 600.0;
+const MAP_WIDTH: usize = 1200;
+const MAP_HEIGHT: usize = 1200;
 
 fn setup(
     mut commands: Commands,
@@ -528,7 +534,10 @@ fn move_player(
     };
     let translation = transform.translation;
 
-    let speed = 80.0;
+    let mut speed = 120.0;
+    if input.pressed(KeyCode::ControlLeft) {
+        speed /= 4.0;
+    }
     if input.pressed(KeyCode::KeyW) {
         // transform.translation = Vec3 {
         //     z: translation.z - step,

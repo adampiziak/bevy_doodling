@@ -68,10 +68,7 @@ struct Vertex {
 @vertex
 fn vertex(vertex_in: Vertex) -> VertexOutput {
     var vertex = vertex_in;
-    let map_width = 600;
-    let map_height = 600u;
     let pl = patch_state.level;
-    let map_center = vec2f(300.0, 300.0);
     var x = vertex.position[0]*patch_state.side_length + patch_state.offset_x;
     var z = vertex.position[2]*patch_state.side_length + patch_state.offset_y;
     var partial = patch_state.partial == 1u;
@@ -100,11 +97,13 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     x = mvertex.x;
     z = mvertex.y;
 
+    let map_h = 1200.0;
     
-    let xi = x + 300.0;
-    let zi = z + 300.0;
+    let xi = x + map_h/2.0;
+    let zi = z + map_h/2.0;
 
-    let i = u32(600.0*min(round(zi), 599.0) + min(round(xi), 599.0));
+    let i = u32(map_h*min(round(zi), map_h - 1.0) + min(round(xi), map_h - 1.0));
+    // let i = u32(600.0*min(round(zi), 599.0) + min(round(xi), 599.0));
     let height: f32 = data[i];
 
     let computed_normal = normals[i];
@@ -155,7 +154,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 #ifdef VERTEX_COLORS
     // out.color = vertex.color;
     // out.color = vec4f(0.0, 0.0, factor, 1.0);
-    let base = 0.2;
+    let base = 0.4;
     var lc = base;
     // if patch_state.level == 0u {
     //     lc = 0.8;
