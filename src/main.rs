@@ -487,8 +487,8 @@ impl MaterialExtension for WireframeMaterial {
         Ok(())
     }
 }
-const TREE_DEPTH: usize = 3;
-const RANGE_MIN_DIS: f32 = 600.0;
+const TREE_DEPTH: usize = 4;
+const RANGE_MIN_DIS: f32 = 400.0;
 const MAP_WIDTH: usize = 1200;
 const MAP_HEIGHT: usize = 1200;
 
@@ -534,9 +534,9 @@ fn move_player(
     };
     let translation = transform.translation;
 
-    let mut speed = 120.0;
+    let mut speed = 60.0;
     if input.pressed(KeyCode::ControlLeft) {
-        speed /= 4.0;
+        speed *= 4.0;
     }
     if input.pressed(KeyCode::KeyW) {
         // transform.translation = Vec3 {

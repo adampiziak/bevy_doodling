@@ -9,7 +9,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let x = global_id.x;
     let z = global_id.z;
     let i = (z)*map_height + x;
-    let pscale = 133.3;
+    let pscale = 160.0;
     let perlin_x = f32(x)/pscale;
     let perlin_z = f32(z)/pscale;
     let perlin_pt = vec2f(perlin_x, perlin_z);
