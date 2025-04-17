@@ -90,7 +90,8 @@ fn main() {
         .insert_resource(CdlodMaterials::default())
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
-            field1: Timer::from_seconds(3.0, TimerMode::Repeating),
+            // field1: Timer::from_seconds(3.0, TimerMode::Repeating),
+            field1: Timer::from_seconds(0.5, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.14, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.05, TimerMode::Repeating),
         })
