@@ -91,9 +91,9 @@ fn main() {
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
             // field1: Timer::from_seconds(3.0, TimerMode::Repeating),
-            field1: Timer::from_seconds(0.5, TimerMode::Repeating),
+            // field1: Timer::from_seconds(0.2, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.14, TimerMode::Repeating),
-            // field1: Timer::from_seconds(0.05, TimerMode::Repeating),
+            field1: Timer::from_seconds(0.05, TimerMode::Repeating),
         })
         // .insert_resource(WireframeConfig {
         //     // The global wireframe config enables drawing of wireframes on every mesh,
@@ -493,10 +493,11 @@ impl MaterialExtension for WireframeMaterial {
         Ok(())
     }
 }
-const TREE_DEPTH: usize = 3;
-const RANGE_MIN_DIS: f32 = 400.0;
+const TREE_DEPTH: usize = 4;
+const RANGE_MIN_DIS: f32 = 300.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
+const PATCH_SIZE: usize = 8;
 
 fn setup(
     mut commands: Commands,
@@ -651,16 +652,16 @@ fn setup_camera(mut commands: Commands) {
             ..default()
         },
         CascadeShadowConfigBuilder {
-            num_cascades: 1,
+            num_cascades: 2,
             maximum_distance: 1200.0,
             ..Default::default()
         }
         .build(),
         Transform::from_xyz(0.0, 300.0, 0.0).looking_to(
             Vec3 {
-                x: -0.2,
-                y: -0.1,
-                z: 0.2,
+                x: -0.5,
+                y: -0.2,
+                z: 0.5,
             },
             Vec3::Y,
         ),

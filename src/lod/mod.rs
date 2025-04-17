@@ -25,8 +25,8 @@ use kdtree::KdTree;
 use rand::{Rng, random_range, rng};
 
 use crate::{
-    CustomMaterial, EventTimer, HeightBuffer, MAP_HEIGHT, MAP_WIDTH, NormalBuffer, PatchState,
-    RANGE_MIN_DIS, TREE_DEPTH, TangentBuffer, WireframeMaterial,
+    CustomMaterial, EventTimer, HeightBuffer, MAP_HEIGHT, MAP_WIDTH, NormalBuffer, PATCH_SIZE,
+    PatchState, RANGE_MIN_DIS, TREE_DEPTH, TangentBuffer, WireframeMaterial,
 };
 
 struct MeshNode2 {
@@ -133,7 +133,6 @@ impl MeshNode {
     }
 }
 
-const PATCH_SIZE: usize = 16;
 fn patch_coord2index(x: usize, z: usize, patch_size: usize) -> usize {
     z * patch_size + x
 }
@@ -628,7 +627,7 @@ pub fn move_mock_camera(
         return;
     };
 
-    let speed = 300.0;
+    let speed = 200.0;
     let translation = transform.translation;
 
     if input.pressed(KeyCode::ArrowUp) {
