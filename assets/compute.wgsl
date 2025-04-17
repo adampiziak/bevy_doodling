@@ -5,7 +5,7 @@
 
 @compute @workgroup_size(16, 1, 16)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let map_height = 1200u;
+    let map_height = 600u;
     let x = global_id.x;
     let z = global_id.z;
     let i = (z)*map_height + x;
@@ -14,7 +14,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let perlin_z = f32(z)/pscale;
     let perlin_pt = vec2f(perlin_x, perlin_z);
     let texel_size = vec2f(0.2, 0.2);
-    data[i] += perlinNoise2(vec2f(perlin_x, perlin_z))/2.0;
+    data[i] += perlinNoise2(vec2f(perlin_x, perlin_z))*6.0;
     let normal = compute_normal(perlin_pt, texel_size);
     let tangent = compute_tangent(normal);
     normals[i] = vec4f(normal, 1.0);

@@ -1,3 +1,4 @@
+
 #import bevy_pbr::{
     pbr_fragment::pbr_input_from_standard_material,
     pbr_functions::alpha_discard,
@@ -69,25 +70,6 @@ struct Vertex {
 #ifdef VERTEX_POSITIONS
     @location(0) position: vec3<f32>,
 #endif
-#ifdef VERTEX_NORMALS
-    @location(1) normal: vec3<f32>,
-#endif
-#ifdef VERTEX_UVS_A
-    @location(2) uv: vec2<f32>,
-#endif
-#ifdef VERTEX_UVS_B
-    @location(3) uv_b: vec2<f32>,
-#endif
-#ifdef VERTEX_TANGENTS
-    @location(4) tangent: vec4<f32>,
-#endif
-#ifdef VERTEX_COLORS
-    @location(5) color: vec4<f32>,
-#endif
-#ifdef SKINNED
-    @location(6) joint_indices: vec4<u32>,
-    @location(7) joint_weights: vec4<f32>,
-#endif
     @builtin(vertex_index) index: u32,
 };
 
@@ -146,13 +128,13 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     let mesh_world_from_local = mesh_functions::get_world_from_local(vertex.instance_index);
     var world_from_local = mesh_world_from_local;
 
-// #ifdef VERTEX_NORMALS
+#ifdef VERTEX_NORMALS
     out.world_normal = mesh_functions::mesh_normal_local_to_world(
         // vertex.normal,
         computed_normal.xyz,
         vertex.instance_index
     );
-// #endif
+#endif
 
 #ifdef VERTEX_POSITIONS
     out.world_position = mesh_functions::mesh_position_local_to_world(world_from_local, vec4<f32>(vertex.position, 1.0));
@@ -179,7 +161,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 #endif
 
 #ifdef VERTEX_COLORS
-    out.color = vertex.color;
+    out.color = vec4f(1.0, 1.0, 1.0, 1.0);
 #endif
 
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
@@ -196,49 +178,4 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     return out;
 }
 
-@fragment
-fn fragment(
-    in: VertexOutput,
-    @builtin(front_facing) is_front: bool,
-) -> FragmentOutput {
-    let mountain_f= 50.0;
-    let grass_f = 100.0;
-    var grass = textureSample(material_color_texture, material_color_sampler, in.uv/grass_f );
-    var grass_norms = textureSample(material_color_texture_normal, material_color_sampler_normal, in.uv/grass_f );
-    var mountain = textureSample(material_color_texture2, material_color_sampler2, in.uv/mountain_f );
-    var mountain_norms = textureSample(mountain_normals, mountain_normals_sampler, in.uv/mountain_f );
-    var h = max(in.world_position[1] + 0.5, 0.1);
-    var f = 1.0/(1.0 + h/32.0);
-    var new_in = in;
-    new_in.world_normal += mix(mountain_norms.xyz, grass_norms.xyz*0.5, f);
 
-    
-    var basecol = 1.0;
-    var basecolvec = vec4f(basecol, basecol, basecol, 1.0);
-    grass -= 0.13;
-    mountain -= 0.1;
-
-
-    var pbr_input = pbr_input_from_standard_material(new_in, is_front);
-    pbr_input.material.base_color = mix(mountain, grass, f);
-
-    // pbr_input.material.base_color = basecolvec;
-    // pbr_input.material.base_color = mountain;
-
-
-
-    var out: FragmentOutput;
-    out.color = apply_pbr_lighting(pbr_input);
-        
-    // out.color += h/20.0;
-
-    // we can optionally modify the lit color before post-processing is applied
-    // out.color = vec4<f32>(vec4<u32>(out.color * f32(my_extended_material.quantize_steps))) / f32(my_extended_material.quantize_steps);
-
-    // apply in-shader post processing (fog, alpha-premultiply, and also tonemapping, debanding if the camera is non-hdr)
-    // note this does not include fullscreen postprocessing effects like bloom.
-    out.color = main_pass_post_lighting_processing(pbr_input, out.color);
-    // out.color = vec4(in.world_normal * 0.5 + 0.5, 1.0);
-    return out;
-
-}

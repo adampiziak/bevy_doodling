@@ -452,7 +452,6 @@ pub fn render_lod(
             Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(mat_handle.clone()),
             NoFrustumCulling,
-            TransmittedShadowReceiver,
             // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
             PatchLabel(frame_id),
         ));
@@ -610,9 +609,8 @@ pub fn setup_mock_camera(
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::default())),
         MeshMaterial3d(materials.add(Color::from(INDIGO_600))),
-        Transform::from_xyz(0.0, 10.0, 0.0).with_scale(Vec3::new(cscale, cscale, cscale)),
+        Transform::from_xyz(0.0, 20.0, 0.0).with_scale(Vec3::new(cscale, cscale, cscale)),
         MockCamera,
-        NotShadowCaster,
     ));
 
     // let mesh = create_mesh_node(MAP_SIZE as f32);

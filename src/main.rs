@@ -3,7 +3,7 @@ use bevy::{
     color::palettes::css::{BLUE, WHITE},
     dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
     pbr::{
-        ExtendedMaterial, MaterialExtension, NotShadowCaster,
+        CascadeShadowConfigBuilder, ExtendedMaterial, MaterialExtension, NotShadowCaster,
         wireframe::{WireframeConfig, WireframePlugin},
     },
     prelude::*,
@@ -31,6 +31,7 @@ use rand::{Rng, distr::uniform, rng};
 
 const COMPUTE_SHADER_ASSET_PATH: &str = "compute.wgsl";
 const TERRAIN_SHADER_PATH: &str = "terrain.wgsl";
+const TERRAIN_PREPASS_PATH: &str = "terrain_prepass.wgsl";
 const WIREFRAME_SHADER_PATH: &str = "wireframe.wgsl";
 const BUFFER_LEN: usize = 16;
 
@@ -89,9 +90,9 @@ fn main() {
         .insert_resource(CdlodMaterials::default())
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
-            // field1: Timer::from_seconds(0.2, TimerMode::Repeating),
+            field1: Timer::from_seconds(3.0, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.14, TimerMode::Repeating),
-            field1: Timer::from_seconds(0.05, TimerMode::Repeating),
+            // field1: Timer::from_seconds(0.05, TimerMode::Repeating),
         })
         // .insert_resource(WireframeConfig {
         //     // The global wireframe config enables drawing of wireframes on every mesh,
@@ -462,9 +463,13 @@ impl MaterialExtension for CustomMaterial {
     fn fragment_shader() -> ShaderRef {
         TERRAIN_SHADER_PATH.into()
     }
-    fn deferred_fragment_shader() -> ShaderRef {
-        TERRAIN_SHADER_PATH.into()
+    fn prepass_vertex_shader() -> ShaderRef {
+        TERRAIN_PREPASS_PATH.into()
     }
+
+    // fn deferred_fragment_shader() -> ShaderRef {
+    //     TERRAIN_SHADER_PATH.into()
+    // }
 }
 impl MaterialExtension for WireframeMaterial {
     fn vertex_shader() -> ShaderRef {
@@ -487,10 +492,10 @@ impl MaterialExtension for WireframeMaterial {
         Ok(())
     }
 }
-const TREE_DEPTH: usize = 4;
+const TREE_DEPTH: usize = 3;
 const RANGE_MIN_DIS: f32 = 400.0;
-const MAP_WIDTH: usize = 1200;
-const MAP_HEIGHT: usize = 1200;
+const MAP_WIDTH: usize = 600;
+const MAP_HEIGHT: usize = 600;
 
 fn setup(
     mut commands: Commands,
@@ -644,10 +649,16 @@ fn setup_camera(mut commands: Commands) {
             shadows_enabled: true,
             ..default()
         },
+        CascadeShadowConfigBuilder {
+            num_cascades: 1,
+            maximum_distance: 1200.0,
+            ..Default::default()
+        }
+        .build(),
         Transform::from_xyz(0.0, 300.0, 0.0).looking_to(
             Vec3 {
                 x: -0.2,
-                y: -0.13,
+                y: -0.1,
                 z: 0.2,
             },
             Vec3::Y,

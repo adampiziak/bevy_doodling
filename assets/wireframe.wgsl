@@ -97,7 +97,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     x = mvertex.x;
     z = mvertex.y;
 
-    let map_h = 1200.0;
+    let map_h = 600.0;
     
     let xi = x + map_h/2.0;
     let zi = z + map_h/2.0;
