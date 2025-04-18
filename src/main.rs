@@ -120,7 +120,7 @@ fn main() {
 }
 
 pub fn print_ent_count(query: Query<Entity>) {
-    println!("MAIN ent COUNT: {}", query.iter().len());
+    // println!("MAIN ent COUNT: {}", query.iter().len());
 }
 
 #[derive(Resource, Default, ExtractResource, Clone)]
@@ -518,49 +518,82 @@ fn setup(
     let heightmap_buffer = vec![0.0; vertex_count];
     let normal_buffer = vec![[0.0; 4]; vertex_count];
     let tangent_buffer = vec![[0.0; 4]; vertex_count];
-    let buffer = ShaderStorageBuffer::from(heightmap_buffer);
+    let mut buffer = ShaderStorageBuffer::from(heightmap_buffer);
+    buffer.buffer_description.usage |= BufferUsages::COPY_SRC;
     let normal_buffer = ShaderStorageBuffer::from(normal_buffer);
     let tangent_buffer = ShaderStorageBuffer::from(tangent_buffer);
     let buffer = buffers.add(buffer);
     let normal_buffer = buffers.add(normal_buffer);
     let tangent_buffer = buffers.add(tangent_buffer);
 
+    // trees
+    let a = Readback::buffer(buffer.clone());
+    commands.spawn((a, Person)).observe(
+        |trigger: Trigger<ReadbackComplete>,
+         mesh_query: Query<&Mesh3d, With<Terrain>>,
+         box_query: Query<(Entity, &BoxLabel2)>,
+         mut ecommands: Commands,
+         asset_server: Res<AssetServer>,
+         mut terrain_state: ResMut<TerrainState>,
+         mut meshes: ResMut<Assets<Mesh>>| {
+            // This matches the type which was used to create the `ShaderStorageBuffer` above,
+            // and is a convenient way to interpret the data.
+            let data: Vec<f32> = trigger.event().to_shader_type();
+            let sample = *data.get(1000).unwrap();
+            // println!("{sample}");
+            // if box_query.iter().len() > 100 {
+            //     ecommands.entity(trigger.observer()).despawn();
+            // }
+            let max_trees = 10000;
+            if box_query.iter().len() > max_trees {
+                return;
+            }
+            if (sample).abs() > 0.2 {
+                println!("COMPUTE READBACK");
+                let rand_offset: f32 = 300.0;
+                // for (entity, label) in box_query.iter() {
+                //     ecommands.entity(entity).despawn();
+                // }
+
+                let tree =
+                    asset_server.load(GltfAssetLabel::Scene(0).from_asset("tree/scene.gltf"));
+                for _ in 0..20 {
+                    // let offset_x = random_range(-rand_offset..rand_offset);
+                    let offset_x = random_range(0_f32..rand_offset);
+                    // let offset_y = random_range(-rand_offset..rand_offset);
+                    // let offset_z = random_range(-rand_offset..rand_offset);
+                    let offset_z = random_range(0_f32..rand_offset);
+                    // let box_mesh = meshes.add(Cuboid::default());
+                    // let box_mat = materials2.add(Color::WHITE);
+
+                    // buffer.ob
+
+                    let i = offset_z.round() as usize * MAP_HEIGHT + offset_x as usize;
+                    let i = i.min(data.len() - 1);
+                    let height = data[i];
+
+                    ecommands.spawn((
+                        SceneRoot(tree.clone_weak()),
+                        BoxLabel2,
+                        NotShadowReceiver,
+                        // NotShadowCaster,
+                        // Transform::from_xyz(0.0, 0.0, 0.0),
+                        Transform::from_xyz(offset_x - 300.0, height, offset_z - 300.0)
+                            .with_scale(Vec3::splat(0.5)),
+                    ));
+                    //     ecommands.entity(trigger.observer()).despawn();
+                }
+            } else {
+                println!("STILL WAITING");
+            }
+            // info!("Buffer {:?}", data);
+            // terrain_state.stage = TerrainStage::Idle;
+        },
+    );
     commands.insert_resource(terrain_state);
     commands.insert_resource(HeightBuffer(buffer));
     commands.insert_resource(NormalBuffer(normal_buffer));
     commands.insert_resource(TangentBuffer(tangent_buffer));
-    // trees
-    let c = Cuboid::default().mesh().build();
-    let a = c.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len();
-    // println!("CUBE HAS {a} vertices");
-    // if box_query.iter().len() == 0 {
-    let rand_offset: f32 = 200.0;
-    let fox_handle = asset_server.load(GltfAssetLabel::Scene(0).from_asset("pinetree.glb"));
-    for _ in 0..5000 {
-        let offset_x = random_range(-rand_offset..rand_offset);
-        let offset_y = random_range(-rand_offset..rand_offset);
-        let offset_z = random_range(-rand_offset..rand_offset);
-        // let box_mesh = meshes.add(Cuboid::default());
-        // let box_mat = materials2.add(Color::WHITE);
-
-        commands.spawn((
-            SceneRoot(fox_handle.clone_weak()),
-            BoxLabel2,
-            // NotShadowReceiver,
-            // Transform::from_xyz(offset_x, 2.0, offset_z),
-            Transform::from_xyz(offset_x, 2.0, offset_z).with_scale(Vec3::splat(0.1)),
-        ));
-        // SceneRoot(fox_handle.clone()),
-        // BoxLabel2,
-        // Transform::from_xyz(offset_x, offset_y, offset_z));
-        // // commands.spawn((
-        //     Mesh3d(box_mesh.clone_weak()),
-        //     MeshMaterial3d(box_mat.clone_weak()),
-        //     BoxLabel2,
-        //     Transform::from_xyz(offset_x, offset_y, offset_z),
-        // ));
-        // }
-    }
 }
 
 #[derive(Component)]
@@ -690,7 +723,7 @@ fn setup_camera(mut commands: Commands) {
             ..default()
         },
         CascadeShadowConfigBuilder {
-            num_cascades: 5,
+            num_cascades: 4,
 
             maximum_distance: 1200.0,
             ..Default::default()
