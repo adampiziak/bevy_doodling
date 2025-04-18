@@ -1,5 +1,5 @@
 {
-  description = "Minimal Rust development environment for Bevy project";
+  description = "A devShell example";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -19,53 +19,29 @@
       system:
       let
         overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs { inherit system overlays; };
-        rustToolchain = pkgs.rust-bin.nightly.latest.default.override {
-          extensions = [
-            "rust-src"
-            "rust-analyzer"
-            "clippy"
-          ];
+        pkgs = import nixpkgs {
+          inherit system overlays;
         };
       in
       {
-        devShells.default = pkgs.mkShell {
-          nativeBuildInputs = with pkgs; [ pkg-config ];
-          buildInputs = with pkgs; [
-            rustToolchain
-            clang
-            llvmPackages_latest.bintools
-            udev
-            alsa-lib
-            vulkan-loader
-            xorg.libX11
-            xorg.libXcursor
-            xorg.libXi
-            xorg.libXrandr
-            libxkbcommon
-            wayland
-            glibc.dev
-            glib.dev
-            bacon
-          ];
+        devShells.default =
+          with pkgs;
+          mkShell {
+            nativeBuildInputs = [ pkg-config ];
+            buildInputs = [
+              openssl
+              alsa-lib-with-plugins
+              udev
+              eza
+              fd
+              rust-bin.beta.latest.default
+            ];
 
-          shellHook = ''
-            export PATH=$PATH:''${CARGO_HOME:-~/.cargo}/bin
-            export LD_LIBRARY_PATH=${
-              pkgs.lib.makeLibraryPath [
-                pkgs.vulkan-loader
-                pkgs.libxkbcommon
-                pkgs.wayland
-                pkgs.alsa-lib
-                pkgs.udev
-              ]
-            }:$LD_LIBRARY_PATH
-            export LIBCLANG_PATH="${pkgs.llvmPackages_latest.libclang.lib}/lib"
-            export BINDGEN_EXTRA_CLANG_ARGS="-I${pkgs.glibc.dev}/include -I${pkgs.llvmPackages_latest.libclang.lib}/lib/clang/${pkgs.llvmPackages_latest.libclang.version}/include -I${pkgs.glib.dev}/include/glib-2.0 -I${pkgs.glib.out}/lib/glib-2.0/include/"
-            export RUSTFLAGS="-C link-arg=-fuse-ld=lld"
-            echo "Bevy development environment loaded!"
-          '';
-        };
+            shellHook = ''
+              alias ls=eza
+              alias find=fd
+            '';
+          };
       }
     );
 }
