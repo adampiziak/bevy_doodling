@@ -13,7 +13,7 @@ use bevy::{
         bounding::{Aabb3d, BoundingSphere, BoundingVolume, IntersectsVolume},
         primitives::Cuboid,
     },
-    pbr::{ExtendedMaterial, NotShadowCaster, TransmittedShadowReceiver},
+    pbr::{ExtendedMaterial, NotShadowCaster, NotShadowReceiver, TransmittedShadowReceiver},
     prelude::*,
     render::{
         mesh::{Indices, Mesh, Mesh3d, MeshBuilder, PlaneMeshBuilder, PrimitiveTopology},
@@ -192,6 +192,9 @@ fn create_patch_mesh(size: usize) -> Mesh {
 #[derive(Component)]
 pub struct PatchLabel(u32);
 
+#[derive(Component)]
+pub struct BoxLabel2;
+
 #[derive(Resource, Default)]
 pub struct CdlodMaterials {
     materials: Vec<Handle<ExtendedMaterial<StandardMaterial, WireframeMaterial>>>,
@@ -208,12 +211,12 @@ pub fn render_lod(
     tangent_buffer: Res<TangentBuffer>,
     input: Res<ButtonInput<KeyCode>>,
     mut cdlod_state: ResMut<CdlodMaterials>,
-    mesh_query: Query<(Entity, &PatchLabel)>,
+    (mesh_query, box_query): (Query<(Entity, &PatchLabel)>, Query<(Entity, &BoxLabel2)>),
     time: Res<Time>,
     mut enable_wireframe: ResMut<EnableWireframe>,
-    mut gizmos: Gizmos,
     mut timer: ResMut<EventTimer>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut materials2: ResMut<Assets<StandardMaterial>>,
     mut custom_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CustomMaterial>>>,
     mut wire_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, WireframeMaterial>>>,
 ) {
@@ -246,6 +249,9 @@ pub fn render_lod(
     println!("ENTITY COUNT {}", count);
     println!("MAT COUNT {}", mat_count);
     println!("wire COUNT {}", wire_count);
+    // for (entity, label) in box_query.iter() {
+    //     commands.entity(entity).despawn();
+    // }
     for (entity, label) in mesh_query.iter() {
         commands.entity(entity).despawn();
         // if label.0 != frame_id {

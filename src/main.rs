@@ -4,6 +4,7 @@ use bevy::{
     dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
     pbr::{
         CascadeShadowConfigBuilder, ExtendedMaterial, MaterialExtension, NotShadowCaster,
+        NotShadowReceiver,
         wireframe::{WireframeConfig, WireframePlugin},
     },
     prelude::*,
@@ -27,7 +28,7 @@ use bevy::{
     text::FontSmoothing,
 };
 use lod::{CdlodMaterials, EnableWireframe, move_mock_camera, render_lod, setup_mock_camera};
-use rand::{Rng, distr::uniform, rng};
+use rand::{Rng, distr::uniform, random_range, rng};
 
 const COMPUTE_SHADER_ASSET_PATH: &str = "compute.wgsl";
 const TERRAIN_SHADER_PATH: &str = "terrain.wgsl";
@@ -91,9 +92,10 @@ fn main() {
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
             // field1: Timer::from_seconds(3.0, TimerMode::Repeating),
+            field1: Timer::from_seconds(1.0, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.2, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.14, TimerMode::Repeating),
-            field1: Timer::from_seconds(0.05, TimerMode::Repeating),
+            // field1: Timer::from_seconds(0.05, TimerMode::Repeating),
         })
         // .insert_resource(WireframeConfig {
         //     // The global wireframe config enables drawing of wireframes on every mesh,
@@ -493,11 +495,14 @@ impl MaterialExtension for WireframeMaterial {
         Ok(())
     }
 }
-const TREE_DEPTH: usize = 4;
+const TREE_DEPTH: usize = 3;
 const RANGE_MIN_DIS: f32 = 300.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
+
 const PATCH_SIZE: usize = 8;
+#[derive(Component)]
+pub struct BoxLabel2;
 
 fn setup(
     mut commands: Commands,
@@ -506,6 +511,7 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut buffers: ResMut<Assets<ShaderStorageBuffer>>,
     mut custom_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CustomMaterial>>>,
+    asset_server: Res<AssetServer>,
 ) {
     let terrain_state = TerrainState::default();
     let vertex_count = MAP_HEIGHT * MAP_WIDTH;
@@ -523,6 +529,38 @@ fn setup(
     commands.insert_resource(HeightBuffer(buffer));
     commands.insert_resource(NormalBuffer(normal_buffer));
     commands.insert_resource(TangentBuffer(tangent_buffer));
+    // trees
+    let c = Cuboid::default().mesh().build();
+    let a = c.attribute(Mesh::ATTRIBUTE_POSITION).unwrap().len();
+    // println!("CUBE HAS {a} vertices");
+    // if box_query.iter().len() == 0 {
+    let rand_offset: f32 = 200.0;
+    let fox_handle = asset_server.load(GltfAssetLabel::Scene(0).from_asset("pinetree.glb"));
+    for _ in 0..5000 {
+        let offset_x = random_range(-rand_offset..rand_offset);
+        let offset_y = random_range(-rand_offset..rand_offset);
+        let offset_z = random_range(-rand_offset..rand_offset);
+        // let box_mesh = meshes.add(Cuboid::default());
+        // let box_mat = materials2.add(Color::WHITE);
+
+        commands.spawn((
+            SceneRoot(fox_handle.clone_weak()),
+            BoxLabel2,
+            // NotShadowReceiver,
+            // Transform::from_xyz(offset_x, 2.0, offset_z),
+            Transform::from_xyz(offset_x, 2.0, offset_z).with_scale(Vec3::splat(0.1)),
+        ));
+        // SceneRoot(fox_handle.clone()),
+        // BoxLabel2,
+        // Transform::from_xyz(offset_x, offset_y, offset_z));
+        // // commands.spawn((
+        //     Mesh3d(box_mesh.clone_weak()),
+        //     MeshMaterial3d(box_mat.clone_weak()),
+        //     BoxLabel2,
+        //     Transform::from_xyz(offset_x, offset_y, offset_z),
+        // ));
+        // }
+    }
 }
 
 #[derive(Component)]
@@ -652,7 +690,8 @@ fn setup_camera(mut commands: Commands) {
             ..default()
         },
         CascadeShadowConfigBuilder {
-            num_cascades: 2,
+            num_cascades: 5,
+
             maximum_distance: 1200.0,
             ..Default::default()
         }

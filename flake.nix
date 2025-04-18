@@ -22,26 +22,34 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
+
+        bevyBuildInputs = with pkgs; [
+          rust-analyzer
+          udev
+          alsa-lib-with-plugins
+          vulkan-loader
+          xorg.libX11
+          xorg.libXcursor
+          xorg.libXi
+          xorg.libXrandr
+          libxkbcommon
+          wayland
+          rust-bin.beta.latest.default
+        ];
       in
       {
-        devShells.default =
-          with pkgs;
-          mkShell {
-            nativeBuildInputs = [ pkg-config ];
-            buildInputs = [
-              openssl
-              alsa-lib-with-plugins
-              udev
-              eza
-              fd
-              rust-bin.beta.latest.default
-            ];
+        devShells.default = pkgs.mkShell {
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = bevyBuildInputs;
+          shellHook = ''
+            export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath bevyBuildInputs}
+          '';
+        };
 
-            shellHook = ''
-              alias ls=eza
-              alias find=fd
-            '';
-          };
+        packages.default = pkgs.writeShellScriptBin "lod" ''
+          export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath bevyBuildInputs}:./target/release:./target/release/deps
+          exec ./target/release/lod "$@"
+        '';
       }
     );
 }
