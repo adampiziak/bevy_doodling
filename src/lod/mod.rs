@@ -367,7 +367,7 @@ pub fn render_lod(
         );
         let cust_mat = ExtendedMaterial {
             base: StandardMaterial {
-                perceptual_roughness: 0.9,
+                perceptual_roughness: 1.0,
                 ..Default::default()
             },
             extension: CustomMaterial {

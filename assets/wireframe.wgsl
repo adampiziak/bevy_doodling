@@ -154,7 +154,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 #ifdef VERTEX_COLORS
     // out.color = vertex.color;
     // out.color = vec4f(0.0, 0.0, factor, 1.0);
-    let base = 0.1;
+    let base = 0.2;
     var lc = base;
     // if patch_state.level == 0u {
     //     lc = 0.8;
