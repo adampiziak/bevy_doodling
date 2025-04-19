@@ -93,8 +93,8 @@ fn main() {
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
             // field1: Timer::from_seconds(3.0, TimerMode::Repeating),
-            field1: Timer::from_seconds(1.0, TimerMode::Repeating),
-            // field1: Timer::from_seconds(0.2, TimerMode::Repeating),
+            // field1: Timer::from_seconds(1.0, TimerMode::Repeating),
+            field1: Timer::from_seconds(0.2, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.14, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.05, TimerMode::Repeating),
         })
@@ -501,7 +501,7 @@ const RANGE_MIN_DIS: f32 = 140.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
 
-const PATCH_SIZE: usize = 32;
+const PATCH_SIZE: usize = 16;
 #[derive(Component)]
 pub struct BoxLabel2;
 
@@ -551,7 +551,7 @@ fn setup(
             }
             let data: Vec<f32> = trigger.event().to_shader_type();
             let sample = *data.get(50000).unwrap();
-            if (sample).abs() > 0.3 {
+            if (sample).abs() > 1.0 {
                 println!("COMPUTE READBACK");
                 let rand_offset: f32 = 600.0;
                 // for (entity, label) in box_query.iter() {
