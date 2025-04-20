@@ -81,7 +81,6 @@ fn main() {
             ExtractResourcePlugin::<NormalBuffer>::default(),
             ExtractResourcePlugin::<TangentBuffer>::default(),
             ExtractResourcePlugin::<HeightMapTexture>::default(),
-            // ExtractResourcePlugin::<ReadbackImage>::default(),
             ExtractResourcePlugin::<TerrainStageState>::default(),
         ))
         .add_event::<ComputeFinished>()
@@ -90,32 +89,20 @@ fn main() {
         .insert_resource(TerrainState::default())
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
-            // field1: Timer::from_seconds(3.0, TimerMode::Repeating),
-            // field1: Timer::from_seconds(1.0, TimerMode::Repeating),
             field1: Timer::from_seconds(0.2, TimerMode::Repeating),
-            // field1: Timer::from_seconds(0.14, TimerMode::Repeating),
-            // field1: Timer::from_seconds(0.05, TimerMode::Repeating),
         })
-        // .insert_resource(WireframeConfig {
-        //     // The global wireframe config enables drawing of wireframes on every mesh,
-        //     // except those with `NoWireframe`. Meshes with `Wireframe` will always have a wireframe,
-        //     // regardless of the global configuration.
-        //     global: true,
-        //     // Controls the default color of all wireframes. Used as the default color for global wireframes.
-        //     // Can be changed per mesh using the `WireframeColor` component.
-        //     default_color: WHITE.into(),
-        // })
-        .add_systems(Startup, setup)
-        // .add_systems(Startup, setup_compute)
-        .add_systems(Update, move_player)
-        .add_systems(Update, render_terrain)
-        // .add_systems(Update, toggle_wireframe)
-        .add_systems(Update, compute_on_input)
-        .add_systems(Startup, setup_camera)
-        .add_systems(Update, coordinate_compute)
-        .add_systems(Startup, setup_mock_camera)
-        .add_systems(Update, move_mock_camera)
-        .add_systems(Update, render_lod)
+        .add_systems(Startup, (setup, setup_mock_camera, setup_camera))
+        .add_systems(
+            Update,
+            (
+                move_player,
+                render_terrain,
+                compute_on_input,
+                coordinate_compute,
+                move_mock_camera,
+                render_lod,
+            ),
+        )
         .run();
 }
 
@@ -315,12 +302,13 @@ fn render_terrain(
         // let tree =
         //     asset_server.load(GltfAssetLabel::Scene(0).from_asset("tree/scene.gltf"));
         // let box_mesh = meshes.add(Cuboid::from_size(Vec3::splat(2.0)));
-        let box_mesh = meshes.add(ConeMeshBuilder::new(0.8, 1.5, 4).build());
+        let box_mesh = meshes.add(ConeMeshBuilder::new(0.6, 1.5, 3).build());
         let mut box_mat: StandardMaterial = Color::from(FOREST_GREEN).darker(0.16).into();
         box_mat.perceptual_roughness = 1.0;
         let box_mat = materials.add(box_mat);
         let data = &terrain_state.heightmap;
-        for _ in 0..20 {
+        println!("COMPUT FINISHED");
+        for _ in 0..100000 {
             // let offset_x = random_range(-rand_offset..rand_offset);
             let offset_x = random_range(0_f32..rand_offset);
             // let offset_y = random_range(-rand_offset..rand_offset);
@@ -333,9 +321,9 @@ fn render_terrain(
             let i = offset_z.round() as usize * MAP_HEIGHT + offset_x as usize;
             let i = i.min(data.len() - 1);
             let height = data[i];
-            println!("{height}");
             if height < 1.0 {
-                let hlod_co = 400.0;
+                let hlod_co = 500.0;
+                let hbias = 0.5;
                 commands.spawn((
                     // SceneRoot(tree.clone_weak()),
                     Mesh3d(box_mesh.clone()),
@@ -343,10 +331,10 @@ fn render_terrain(
                     BoxLabel2,
                     NotShadowReceiver,
                     // NotShadowCaster,
-                    VisibilityRange::abrupt(30.0, hlod_co),
+                    VisibilityRange::abrupt(1.0, hlod_co),
                     // NotShadowCaster,
                     // Transform::from_xyz(0.0, 0.0, 0.0),
-                    Transform::from_xyz(offset_x - 300.0, height, offset_z - 300.0),
+                    Transform::from_xyz(offset_x - 300.0, height + hbias, offset_z - 300.0),
                     // .with_scale(Vec3::splat(0.5)),
                 ));
                 commands.spawn((
@@ -359,11 +347,10 @@ fn render_terrain(
                     VisibilityRange::abrupt(hlod_co, 700.0),
                     // NotShadowCaster,
                     // Transform::from_xyz(0.0, 0.0, 0.0),
-                    Transform::from_xyz(offset_x - 300.0, height, offset_z - 300.0),
+                    Transform::from_xyz(offset_x - 300.0, height + hbias, offset_z - 300.0),
                     // .with_scale(Vec3::splat(0.5)),
                 ));
             }
-            println!("COMPUT FINISHED");
         }
         compute_finished.clear();
     }
@@ -407,7 +394,7 @@ fn coordinate_compute(
     if !start_compute_event.is_empty() {
         if coordinator.ready() {
             terrain_state.stage = TerrainStage::Start;
-            coordinator.stage = ComputeStage::Waiting(time.elapsed() + Duration::from_millis(2000));
+            coordinator.stage = ComputeStage::Waiting(time.elapsed() + Duration::from_millis(1000));
             start_compute_event.clear();
         }
     }
