@@ -80,11 +80,12 @@ fn main() {
             ExtractResourcePlugin::<TangentBuffer>::default(),
             ExtractResourcePlugin::<HeightMapTexture>::default(),
             // ExtractResourcePlugin::<ReadbackImage>::default(),
-            ExtractResourcePlugin::<TerrainState>::default(),
+            ExtractResourcePlugin::<TerrainStageState>::default(),
         ))
         .add_event::<ComputeFinished>()
         .add_event::<RunComputePass>()
         .insert_resource(CdlodMaterials::default())
+        .insert_resource(TerrainState::default())
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
             // field1: Timer::from_seconds(3.0, TimerMode::Repeating),
@@ -105,6 +106,7 @@ fn main() {
         .add_systems(Startup, setup)
         // .add_systems(Startup, setup_compute)
         .add_systems(Update, move_player)
+        .add_systems(Update, render_terrain)
         // .add_systems(Update, toggle_wireframe)
         .add_systems(Update, compute_on_input)
         .add_systems(Startup, setup_camera)
@@ -116,7 +118,7 @@ fn main() {
 }
 
 #[derive(Resource, Default, ExtractResource, Clone)]
-struct TerrainState {
+struct TerrainStageState {
     stage: TerrainStage,
     buffer_size: usize,
 }
@@ -142,12 +144,14 @@ struct ComputeNodeLabel;
 fn compute_on_input(
     mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,
-    mut terrain_state: ResMut<TerrainState>,
+    mut terrain_state: ResMut<TerrainStageState>,
+    mut compute_event: EventWriter<RunComputePass>,
     query: Query<Option<&Readback>>,
 ) {
     // println!("TERRAIN STATE IS {:?}", terrain_state.stage);
     if input.pressed(KeyCode::KeyJ) && terrain_state.stage == TerrainStage::Idle {
-        terrain_state.stage = TerrainStage::Start;
+        // terrain_state.stage = TerrainStage::Start;
+        compute_event.write(RunComputePass);
     }
     // if terrain_state.stage == TerrainStage::Idle {
     //     terrain_state.stage = TerrainStage::Start;
@@ -205,7 +209,7 @@ impl render_graph::Node for ComputeNode {
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), render_graph::NodeRunError> {
-        let Some(terrain_state) = world.get_resource::<TerrainState>() else {
+        let Some(terrain_state) = world.get_resource::<TerrainStageState>() else {
             return Ok(());
         };
 
@@ -283,16 +287,27 @@ struct ComputePipeline {
 #[derive(Component)]
 struct Person;
 
+#[derive(Resource, Default)]
+struct TerrainState {
+    heightmap: Vec<f32>,
+}
+
+fn render_terrain(mut compute_finished: EventReader<ComputeFinished>) {
+    for ev in compute_finished.read() {
+        println!("COMPUT FINISHED");
+    }
+}
+
 #[derive(Event)]
 struct RunComputePass;
 
 #[derive(Event)]
-struct ComputeFinished(Vec<f32>);
+struct ComputeFinished;
 
 fn coordinate_compute(
     mut commands: Commands,
     mut coordinator: ResMut<ComputeCoordinater>,
-    mut terrain_state: ResMut<TerrainState>,
+    mut terrain_state: ResMut<TerrainStageState>,
     time: Res<Time>,
     mut start_compute_event: EventReader<RunComputePass>,
 ) {
@@ -303,10 +318,12 @@ fn coordinate_compute(
             commands.spawn(coordinator.readback()).observe(
                 |trigger: Trigger<ReadbackComplete>,
                  mut ecommands: Commands,
+                 mut terrain_state: ResMut<TerrainState>,
                  mut coordinator: ResMut<ComputeCoordinater>,
                  mut ev_compute_finished: EventWriter<ComputeFinished>| {
                     let data: Vec<f32> = trigger.event().to_shader_type();
-                    ev_compute_finished.write(ComputeFinished(data));
+                    terrain_state.heightmap = data;
+                    ev_compute_finished.write(ComputeFinished);
                     ecommands.entity(trigger.observer()).despawn();
                     coordinator.stage = ComputeStage::Ready;
                 },
@@ -315,7 +332,7 @@ fn coordinate_compute(
         return;
     }
 
-    // if compute is request, then start
+    // if compute is requested, then start
     if !start_compute_event.is_empty() {
         if coordinator.ready() {
             terrain_state.stage = TerrainStage::Start;
@@ -501,7 +518,7 @@ fn setup(
     mut custom_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CustomMaterial>>>,
     asset_server: Res<AssetServer>,
 ) {
-    let terrain_state = TerrainState::default();
+    let terrain_state = TerrainStageState::default();
     let vertex_count = MAP_HEIGHT * MAP_WIDTH;
     let heightmap_buffer = vec![0.0; vertex_count];
     let normal_buffer = vec![[0.0; 4]; vertex_count];
