@@ -26,7 +26,7 @@ use rand::{Rng, random_range, rng};
 
 use crate::{
     CustomMaterial, EventTimer, HeightBuffer, MAP_HEIGHT, MAP_WIDTH, NormalBuffer, PATCH_SIZE,
-    PatchState, RANGE_MIN_DIS, TREE_DEPTH, TangentBuffer, WireframeMaterial,
+    PatchState, Player, RANGE_MIN_DIS, TREE_DEPTH, TangentBuffer, WireframeMaterial,
 };
 
 struct MeshNode2 {
@@ -204,7 +204,10 @@ pub struct EnableWireframe(bool);
 
 pub fn render_lod(
     mut commands: Commands,
-    mock_camera: Query<&Transform, With<MockCamera>>,
+    (mock_camera, player): (
+        Query<&Transform, With<MockCamera>>,
+        Query<&Transform, With<Player>>,
+    ),
     asset_server: Res<AssetServer>,
     buffer: Res<HeightBuffer>,
     normal_buffer: Res<NormalBuffer>,
@@ -220,9 +223,14 @@ pub fn render_lod(
     mut custom_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CustomMaterial>>>,
     mut wire_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, WireframeMaterial>>>,
 ) {
-    let Ok(transform) = mock_camera.single() else {
+    // let Ok(transform) = mock_camera.single() else {
+    //     return;
+    // };
+
+    let Ok(transform) = player.single() else {
         return;
     };
+    // let translation = transform.translation;
 
     if input.just_pressed(KeyCode::KeyU) {
         enable_wireframe.0 = !enable_wireframe.0;
@@ -292,7 +300,6 @@ pub fn render_lod(
         ri += 1;
     }
 
-    let camera_center = transform.translation.xz();
     // println!("CAMERA {:?}", camera_center);
     let map_boundry = Aabb3d::new(
         Vec3::new(0.0, 0.0, 0.0),
@@ -456,7 +463,7 @@ pub fn render_lod(
         commands.spawn((
             Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(mat_handle.clone()),
-            NoFrustumCulling,
+            // NoFrustumCulling,
             // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
             PatchLabel(frame_id),
         ));
@@ -465,7 +472,7 @@ pub fn render_lod(
             commands.spawn((
                 Mesh3d(mesh_handle.clone()),
                 MeshMaterial3d(wire_handle.clone()),
-                NoFrustumCulling,
+                // NoFrustumCulling,
                 // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
                 PatchLabel(frame_id),
             ));
@@ -616,6 +623,7 @@ pub fn setup_mock_camera(
         MeshMaterial3d(materials.add(Color::from(INDIGO_600))),
         Transform::from_xyz(0.0, 20.0, 0.0).with_scale(Vec3::new(cscale, cscale, cscale)),
         MockCamera,
+        Visibility::Hidden,
     ));
 
     // let mesh = create_mesh_node(MAP_SIZE as f32);

@@ -308,7 +308,7 @@ fn render_terrain(
         let box_mat = materials.add(box_mat);
         let data = &terrain_state.heightmap;
         println!("COMPUT FINISHED");
-        for _ in 0..100000 {
+        for _ in 0..500 {
             // let offset_x = random_range(-rand_offset..rand_offset);
             let offset_x = random_range(0_f32..rand_offset);
             // let offset_y = random_range(-rand_offset..rand_offset);
@@ -826,12 +826,10 @@ fn setup_camera(mut commands: Commands) {
                 ),
             ));
         });
-    commands.spawn(
-        (AmbientLight {
-            brightness: 2000.0,
-            ..Default::default()
-        }),
-    );
+    // commands.spawn(AmbientLight {
+    //     brightness: 2000.0,
+    //     ..Default::default()
+    // });
     commands.spawn((
         DirectionalLight {
             illuminance: 8_000.0,

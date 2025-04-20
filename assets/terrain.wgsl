@@ -105,7 +105,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
     var vpos = vec3f(x, 0.0, z);
     let sl = patch_state.side_length;
     let camera_pos = patch_state.camera_pos.xyz;
-    let dis = distance(camera_pos.xz, vpos.xz);
+    let dis = distance(camera_pos.xyz, vpos.xyz);
     var low = 0.0;
     var vi = patch_state.level;
     let high = patch_state.ranges[vi].x;
