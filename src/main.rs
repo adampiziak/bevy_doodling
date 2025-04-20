@@ -286,19 +286,41 @@ struct Person;
 #[derive(Event)]
 struct RunComputePass;
 
+#[derive(Event)]
+struct ComputeFinished(Vec<f32>);
+
 fn coordinate_compute(
     mut commands: Commands,
     mut coordinator: ResMut<ComputeCoordinater>,
     mut terrain_state: ResMut<TerrainState>,
     time: Res<Time>,
-    mut event_reader: EventReader<RunComputePass>,
+    mut start_compute_event: EventReader<RunComputePass>,
 ) {
-    if let ComputeStage::Waiting(until) = coordinator.stage {}
-    if !event_reader.is_empty() {
+    // Waiting state, wait until elapsed time to read
+    if let ComputeStage::Waiting(until) = coordinator.stage {
+        if time.elapsed() > until {
+            coordinator.stage = ComputeStage::Reading;
+            commands.spawn(coordinator.readback()).observe(
+                |trigger: Trigger<ReadbackComplete>,
+                 mut ecommands: Commands,
+                 mut coordinator: ResMut<ComputeCoordinater>,
+                 mut ev_compute_finished: EventWriter<ComputeFinished>| {
+                    let data: Vec<f32> = trigger.event().to_shader_type();
+                    ev_compute_finished.write(ComputeFinished(data));
+                    ecommands.entity(trigger.observer()).despawn();
+                    coordinator.stage = ComputeStage::Ready;
+                },
+            );
+        }
+        return;
+    }
+
+    // if compute is request, then start
+    if !start_compute_event.is_empty() {
         if coordinator.ready() {
             terrain_state.stage = TerrainStage::Start;
             coordinator.stage = ComputeStage::Waiting(time.elapsed() + Duration::from_millis(2000));
-            event_reader.clear();
+            start_compute_event.clear();
         }
     }
 }
@@ -507,7 +529,7 @@ fn setup(
 enum ComputeStage {
     Ready,
     Waiting(Duration),
-    Updating,
+    Reading,
 }
 
 #[derive(Resource)]
@@ -516,9 +538,6 @@ struct ComputeCoordinater {
     heightmap: Vec<f32>,
     buffer: Handle<ShaderStorageBuffer>,
 }
-
-#[derive(Event)]
-struct ComputeFinished(Vec<f32>);
 
 impl ComputeCoordinater {
     fn new(buffer: Handle<ShaderStorageBuffer>) -> ComputeCoordinater {
@@ -533,8 +552,13 @@ impl ComputeCoordinater {
         self.stage == ComputeStage::Ready
     }
 
+    fn readback(&self) -> Readback {
+        Readback::Buffer(self.buffer.clone())
+    }
+
     fn update(&mut self, mut commands: Commands) {
-        self.stage = ComputeStage::Updating;
+        // self.stage = ComputeStage::Updating;
+        /*
         let readback = Readback::buffer(self.buffer.clone());
         commands.spawn(readback).observe(
             |trigger: Trigger<ReadbackComplete>,
@@ -545,7 +569,6 @@ impl ComputeCoordinater {
                 ecommands.entity(trigger.observer()).despawn();
             },
         );
-        /*
                 let sample = *data.get(50000).unwrap();
                 if (sample).abs() > 1.0 {
                     println!("COMPUTE READBACK");
