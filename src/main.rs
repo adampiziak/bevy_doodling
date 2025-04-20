@@ -1,11 +1,11 @@
+use std::time::Duration;
+
 use bevy::{
-    asset::RenderAssetUsages,
-    color::palettes::css::{BLUE, FOREST_GREEN, WHITE},
+    color::palettes::css::WHITE,
     dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
     pbr::{
         CascadeShadowConfigBuilder, ExtendedMaterial, MaterialExtension, NotShadowCaster,
-        NotShadowReceiver,
-        wireframe::{WireframeConfig, WireframePlugin},
+        wireframe::WireframeConfig,
     },
     prelude::*,
     render::{
@@ -13,29 +13,22 @@ use bevy::{
         extract_component::ExtractComponent,
         extract_resource::{ExtractResource, ExtractResourcePlugin},
         gpu_readback::{Readback, ReadbackComplete},
-        mesh::{ConeMeshBuilder, Indices, PlaneMeshBuilder, VertexAttributeValues},
+        mesh::VertexAttributeValues,
         render_asset::RenderAssets,
         render_graph::{self, RenderGraph, RenderLabel},
-        render_resource::{
-            binding_types::{storage_buffer, texture_storage_2d},
-            *,
-        },
+        render_resource::{binding_types::storage_buffer, *},
         renderer::{RenderContext, RenderDevice},
         settings::{RenderCreation, WgpuSettings},
         storage::{GpuShaderStorageBuffer, ShaderStorageBuffer},
-        texture::GpuImage,
-        view::VisibilityRange,
     },
     text::FontSmoothing,
 };
 use lod::{CdlodMaterials, EnableWireframe, move_mock_camera, render_lod, setup_mock_camera};
-use rand::{Rng, distr::uniform, random_range, rng};
 
 const COMPUTE_SHADER_ASSET_PATH: &str = "compute.wgsl";
 const TERRAIN_SHADER_PATH: &str = "terrain.wgsl";
 const TERRAIN_PREPASS_PATH: &str = "terrain_prepass.wgsl";
 const WIREFRAME_SHADER_PATH: &str = "wireframe.wgsl";
-const BUFFER_LEN: usize = 16;
 
 mod lod;
 #[derive(Resource)]
@@ -89,6 +82,8 @@ fn main() {
             // ExtractResourcePlugin::<ReadbackImage>::default(),
             ExtractResourcePlugin::<TerrainState>::default(),
         ))
+        .add_event::<ComputeFinished>()
+        .add_event::<RunComputePass>()
         .insert_resource(CdlodMaterials::default())
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
@@ -113,15 +108,11 @@ fn main() {
         // .add_systems(Update, toggle_wireframe)
         .add_systems(Update, compute_on_input)
         .add_systems(Startup, setup_camera)
+        .add_systems(Update, coordinate_compute)
         .add_systems(Startup, setup_mock_camera)
         .add_systems(Update, move_mock_camera)
         .add_systems(Update, render_lod)
-        .add_systems(Update, print_ent_count)
         .run();
-}
-
-pub fn print_ent_count(query: Query<Entity>) {
-    // println!("MAIN ent COUNT: {}", query.iter().len());
 }
 
 #[derive(Resource, Default, ExtractResource, Clone)]
@@ -292,49 +283,23 @@ struct ComputePipeline {
 #[derive(Component)]
 struct Person;
 
-fn update_mesh(
+#[derive(Event)]
+struct RunComputePass;
+
+fn coordinate_compute(
     mut commands: Commands,
-    // storage_assets: Res<Assets<ShaderStorageBuffer>>,
+    mut coordinator: ResMut<ComputeCoordinater>,
     mut terrain_state: ResMut<TerrainState>,
-    buffer: Res<HeightBuffer>,
-    query: Query<Entity, With<Person>>, // buffers: Res<RenderAssets<GpuShaderStorageBuffer>>,
+    time: Res<Time>,
+    mut event_reader: EventReader<RunComputePass>,
 ) {
-    let count = query.iter().len();
-    // println!("COUNT {count}");
-    if terrain_state.stage == TerrainStage::Idle {
-        for r in query.iter() {
-            commands.entity(r).despawn();
+    if let ComputeStage::Waiting(until) = coordinator.stage {}
+    if !event_reader.is_empty() {
+        if coordinator.ready() {
+            terrain_state.stage = TerrainStage::Start;
+            coordinator.stage = ComputeStage::Waiting(time.elapsed() + Duration::from_millis(2000));
+            event_reader.clear();
         }
-    }
-    if terrain_state.stage == TerrainStage::Finished && count == 0 {
-        terrain_state.stage = TerrainStage::Reading;
-        println!("FINISH");
-        let b = buffer.0.clone();
-        let a = Readback::buffer(b);
-        commands.spawn((a, Person)).observe(
-            |trigger: Trigger<ReadbackComplete>,
-             mesh_query: Query<&Mesh3d, With<Terrain>>,
-             mut ecommands: Commands,
-             mut terrain_state: ResMut<TerrainState>,
-             mut meshes: ResMut<Assets<Mesh>>| {
-                // This matches the type which was used to create the `ShaderStorageBuffer` above,
-                // and is a convenient way to interpret the data.
-                let data: Vec<[f32; 4]> = trigger.event().to_shader_type();
-                for mesh_handle in mesh_query {
-                    let mesh = meshes.get_mut(mesh_handle).unwrap();
-                    if let Some(VertexAttributeValues::Float32x3(vals)) =
-                        mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION)
-                    {
-                        for (i, v) in vals.iter_mut().enumerate() {
-                            v[1] = data[i][1];
-                        }
-                    }
-                }
-                // info!("Buffer {:?}", data);
-                terrain_state.stage = TerrainStage::Idle;
-                ecommands.entity(trigger.observer()).despawn();
-            },
-        );
     }
 }
 
@@ -527,100 +492,130 @@ fn setup(
     let normal_buffer = buffers.add(normal_buffer);
     let tangent_buffer = buffers.add(tangent_buffer);
 
+    let coordinator = ComputeCoordinater::new(buffer.clone());
+    commands.insert_resource(coordinator);
+
     // trees
-    let a = Readback::buffer(buffer.clone());
-    commands.spawn((a, Person)).observe(
-        |trigger: Trigger<ReadbackComplete>,
-         mesh_query: Query<&Mesh3d, With<Terrain>>,
-         box_query: Query<(Entity, &BoxLabel2)>,
-         mut ecommands: Commands,
-         asset_server: Res<AssetServer>,
-         mut materials: ResMut<Assets<StandardMaterial>>,
-         mut terrain_state: ResMut<TerrainState>,
-         mut meshes: ResMut<Assets<Mesh>>| {
-            // This matches the type which was used to create the `ShaderStorageBuffer` above,
-            // and is a convenient way to interpret the data.
-            // println!("{sample}");
-            // if box_query.iter().len() > 100 {
-            //     ecommands.entity(trigger.observer()).despawn();
-            // }
-            let max_trees = 80000;
-            if box_query.iter().len() > max_trees {
-                println!("RETURN EARLY, 10000");
-                return;
-            }
-            let data: Vec<f32> = trigger.event().to_shader_type();
-            let sample = *data.get(50000).unwrap();
-            if (sample).abs() > 1.0 {
-                println!("COMPUTE READBACK");
-                let rand_offset: f32 = 600.0;
-                // for (entity, label) in box_query.iter() {
-                //     ecommands.entity(entity).despawn();
-                // }
-
-                // let tree =
-                //     asset_server.load(GltfAssetLabel::Scene(0).from_asset("tree/scene.gltf"));
-                // let box_mesh = meshes.add(Cuboid::from_size(Vec3::splat(2.0)));
-                let box_mesh = meshes.add(ConeMeshBuilder::new(0.8, 1.5, 4).build());
-                let mut box_mat: StandardMaterial = Color::from(FOREST_GREEN).darker(0.16).into();
-                box_mat.perceptual_roughness = 1.0;
-                let box_mat = materials.add(box_mat);
-                for _ in 0..20 {
-                    // let offset_x = random_range(-rand_offset..rand_offset);
-                    let offset_x = random_range(0_f32..rand_offset);
-                    // let offset_y = random_range(-rand_offset..rand_offset);
-                    // let offset_z = random_range(-rand_offset..rand_offset);
-                    let offset_z = random_range(0_f32..rand_offset);
-
-                    // buffer.ob
-
-                    let i = offset_z.round() as usize * MAP_HEIGHT + offset_x as usize;
-                    let i = i.min(data.len() - 1);
-                    let height = data[i];
-                    println!("{height}");
-                    if height < 1.0 {
-                        let hlod_co = 400.0;
-                        ecommands.spawn((
-                            // SceneRoot(tree.clone_weak()),
-                            Mesh3d(box_mesh.clone()),
-                            MeshMaterial3d(box_mat.clone()),
-                            BoxLabel2,
-                            NotShadowReceiver,
-                            // NotShadowCaster,
-                            VisibilityRange::abrupt(30.0, hlod_co),
-                            // NotShadowCaster,
-                            // Transform::from_xyz(0.0, 0.0, 0.0),
-                            Transform::from_xyz(offset_x - 300.0, height, offset_z - 300.0),
-                            // .with_scale(Vec3::splat(0.5)),
-                        ));
-                        ecommands.spawn((
-                            // SceneRoot(tree.clone_weak()),
-                            Mesh3d(box_mesh.clone()),
-                            MeshMaterial3d(box_mat.clone()),
-                            BoxLabel2,
-                            NotShadowReceiver,
-                            NotShadowCaster,
-                            VisibilityRange::abrupt(hlod_co, 700.0),
-                            // NotShadowCaster,
-                            // Transform::from_xyz(0.0, 0.0, 0.0),
-                            Transform::from_xyz(offset_x - 300.0, height, offset_z - 300.0),
-                            // .with_scale(Vec3::splat(0.5)),
-                        ));
-                    }
-
-                    //     ecommands.entity(trigger.observer()).despawn();
-                }
-            } else {
-                println!("STILL WAITING");
-            }
-            // info!("Buffer {:?}", data);
-            // terrain_state.stage = TerrainStage::Idle;
-        },
-    );
+    // buffer.read
     commands.insert_resource(terrain_state);
     commands.insert_resource(HeightBuffer(buffer));
     commands.insert_resource(NormalBuffer(normal_buffer));
     commands.insert_resource(TangentBuffer(tangent_buffer));
+}
+
+#[derive(PartialEq)]
+enum ComputeStage {
+    Ready,
+    Waiting(Duration),
+    Updating,
+}
+
+#[derive(Resource)]
+struct ComputeCoordinater {
+    stage: ComputeStage,
+    heightmap: Vec<f32>,
+    buffer: Handle<ShaderStorageBuffer>,
+}
+
+#[derive(Event)]
+struct ComputeFinished(Vec<f32>);
+
+impl ComputeCoordinater {
+    fn new(buffer: Handle<ShaderStorageBuffer>) -> ComputeCoordinater {
+        return ComputeCoordinater {
+            stage: ComputeStage::Ready,
+            heightmap: vec![0.0; MAP_HEIGHT * MAP_WIDTH],
+            buffer,
+        };
+    }
+
+    fn ready(&self) -> bool {
+        self.stage == ComputeStage::Ready
+    }
+
+    fn update(&mut self, mut commands: Commands) {
+        self.stage = ComputeStage::Updating;
+        let readback = Readback::buffer(self.buffer.clone());
+        commands.spawn(readback).observe(
+            |trigger: Trigger<ReadbackComplete>,
+             mut ecommands: Commands,
+             mut ev_compute_finished: EventWriter<ComputeFinished>| {
+                let data: Vec<f32> = trigger.event().to_shader_type();
+                ev_compute_finished.write(ComputeFinished(data));
+                ecommands.entity(trigger.observer()).despawn();
+            },
+        );
+        /*
+                let sample = *data.get(50000).unwrap();
+                if (sample).abs() > 1.0 {
+                    println!("COMPUTE READBACK");
+                    let rand_offset: f32 = 600.0;
+                    // for (entity, label) in box_query.iter() {
+                    //     ecommands.entity(entity).despawn();
+                    // }
+
+                    // let tree =
+                    //     asset_server.load(GltfAssetLabel::Scene(0).from_asset("tree/scene.gltf"));
+                    // let box_mesh = meshes.add(Cuboid::from_size(Vec3::splat(2.0)));
+                    let box_mesh = meshes.add(ConeMeshBuilder::new(0.8, 1.5, 4).build());
+                    let mut box_mat: StandardMaterial =
+                        Color::from(FOREST_GREEN).darker(0.16).into();
+                    box_mat.perceptual_roughness = 1.0;
+                    let box_mat = materials.add(box_mat);
+                    for _ in 0..20 {
+                        // let offset_x = random_range(-rand_offset..rand_offset);
+                        let offset_x = random_range(0_f32..rand_offset);
+                        // let offset_y = random_range(-rand_offset..rand_offset);
+                        // let offset_z = random_range(-rand_offset..rand_offset);
+                        let offset_z = random_range(0_f32..rand_offset);
+
+                        // buffer.ob
+
+                        let i = offset_z.round() as usize * MAP_HEIGHT + offset_x as usize;
+                        let i = i.min(data.len() - 1);
+                        let height = data[i];
+                        println!("{height}");
+                        if height < 1.0 {
+                            let hlod_co = 400.0;
+                            ecommands.spawn((
+                                // SceneRoot(tree.clone_weak()),
+                                Mesh3d(box_mesh.clone()),
+                                MeshMaterial3d(box_mat.clone()),
+                                BoxLabel2,
+                                NotShadowReceiver,
+                                // NotShadowCaster,
+                                VisibilityRange::abrupt(30.0, hlod_co),
+                                // NotShadowCaster,
+                                // Transform::from_xyz(0.0, 0.0, 0.0),
+                                Transform::from_xyz(offset_x - 300.0, height, offset_z - 300.0),
+                                // .with_scale(Vec3::splat(0.5)),
+                            ));
+                            ecommands.spawn((
+                                // SceneRoot(tree.clone_weak()),
+                                Mesh3d(box_mesh.clone()),
+                                MeshMaterial3d(box_mat.clone()),
+                                BoxLabel2,
+                                NotShadowReceiver,
+                                NotShadowCaster,
+                                VisibilityRange::abrupt(hlod_co, 700.0),
+                                // NotShadowCaster,
+                                // Transform::from_xyz(0.0, 0.0, 0.0),
+                                Transform::from_xyz(offset_x - 300.0, height, offset_z - 300.0),
+                                // .with_scale(Vec3::splat(0.5)),
+                            ));
+                        }
+
+                        //     ecommands.entity(trigger.observer()).despawn();
+                    }
+                } else {
+                    println!("STILL WAITING");
+                }
+                // info!("Buffer {:?}", data);
+                // terrain_state.stage = TerrainStage::Idle;
+            },
+        );
+        */
+    }
 }
 
 #[derive(Component)]
