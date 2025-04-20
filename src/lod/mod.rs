@@ -246,9 +246,9 @@ pub fn render_lod(
     let count = mesh_query.iter().len();
     let mat_count = custom_materials.len();
     let wire_count = wire_materials.len();
-    println!("ENTITY COUNT {}", count);
-    println!("MAT COUNT {}", mat_count);
-    println!("wire COUNT {}", wire_count);
+    // println!("ENTITY COUNT {}", count);
+    // println!("MAT COUNT {}", mat_count);
+    // println!("wire COUNT {}", wire_count);
     // for (entity, label) in box_query.iter() {
     //     commands.entity(entity).despawn();
     // }
@@ -293,7 +293,7 @@ pub fn render_lod(
     }
 
     let camera_center = transform.translation.xz();
-    println!("CAMERA {:?}", camera_center);
+    // println!("CAMERA {:?}", camera_center);
     let map_boundry = Aabb3d::new(
         Vec3::new(0.0, 0.0, 0.0),
         Vec3::new(MAP_WIDTH as f32 / 2.0, 0.0, MAP_HEIGHT as f32 / 2.0),
@@ -306,7 +306,7 @@ pub fn render_lod(
     select_lod2(&root_node, TREE_DEPTH - 1, &bounding_spheres, &mut patches);
 
     // remove previous patches
-    println!("NUM PATCHES: {}", patches.len());
+    // println!("NUM PATCHES: {}", patches.len());
 
     // let mut patch_meshes = Vec::new();
 
