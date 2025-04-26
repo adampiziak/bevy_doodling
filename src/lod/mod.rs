@@ -550,14 +550,14 @@ fn select_lod2(
     if !node.boundry.intersects(&lod_boundry) {
         return false;
     }
-    // let aabb = Aabb::from_min_max(node.boundry.min.into(), node.boundry.max.into());
-    let aabb_sphere = node.boundry.bounding_sphere();
-    let sphere = bevy::render::primitives::Sphere {
-        center: aabb_sphere.center,
-        radius: aabb_sphere.radius() * 0.8,
-    };
-    // let af3a = Affine3A::from_translation(node.boundry.center().into());
-    if !frustum.intersects_sphere(&sphere, true) {
+    let aabb = Aabb::from_min_max(node.boundry.min.into(), node.boundry.max.into());
+    // let aabb_sphere = node.boundry.bounding_sphere();
+    // let sphere = bevy::render::primitives::Sphere {
+    //     center: aabb_sphere.center,
+    //     radius: aabb_sphere.radius() * 0.8,
+    // };
+    let af3a = Affine3A::IDENTITY;
+    if !frustum.intersects_obb(&aabb, &af3a, false, false) {
         // if !frustum.intersects_obb(&aabb, &af3a, true, true) {
         // println!("culled");
         // println!("{level}: {}", node.level);

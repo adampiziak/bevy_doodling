@@ -89,7 +89,7 @@ fn main() {
         .insert_resource(TerrainState::default())
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
-            field1: Timer::from_seconds(0.5, TimerMode::Repeating),
+            field1: Timer::from_seconds(3.0, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.02, TimerMode::Repeating),
         })
         .add_systems(Startup, (setup, setup_mock_camera, setup_camera))
@@ -309,7 +309,7 @@ fn render_terrain(
         let box_mat = materials.add(box_mat);
         let data = &terrain_state.heightmap;
         println!("COMPUT FINISHED");
-        for _ in 0..50000 {
+        for _ in 0..5 {
             // let offset_x = random_range(-rand_offset..rand_offset);
             let offset_x = random_range(0_f32..rand_offset);
             // let offset_y = random_range(-rand_offset..rand_offset);
