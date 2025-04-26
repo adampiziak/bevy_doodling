@@ -111,7 +111,7 @@ fn vertex(vertex_in: Vertex) -> VertexOutput {
 
 
     
-    vertex.position = vec3f(x, height + 0.8, z);
+    vertex.position = vec3f(x, height + 0.5, z);
     // vertex.position = vec3f(mvertex.x, vpos.y, mvertex.y);
     var out: VertexOutput;
 

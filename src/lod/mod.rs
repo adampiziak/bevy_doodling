@@ -9,7 +9,7 @@ use bevy::{
     ecs::{component::Component, system::Commands},
     image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
     math::{
-        Dir3, Vec2, Vec3,
+        Affine3A, Dir3, Vec2, Vec3,
         bounding::{Aabb3d, BoundingSphere, BoundingVolume, IntersectsVolume},
         primitives::Cuboid,
     },
@@ -17,6 +17,7 @@ use bevy::{
     prelude::*,
     render::{
         mesh::{Indices, Mesh, Mesh3d, MeshBuilder, PlaneMeshBuilder, PrimitiveTopology},
+        primitives::{Aabb, Frustum},
         render_resource::ShaderType,
         view::NoFrustumCulling,
     },
@@ -204,9 +205,10 @@ pub struct EnableWireframe(bool);
 
 pub fn render_lod(
     mut commands: Commands,
-    (mock_camera, player): (
+    (mock_camera, player, projection): (
         Query<&Transform, With<MockCamera>>,
         Query<&Transform, With<Player>>,
+        Query<&Frustum, With<Camera>>,
     ),
     asset_server: Res<AssetServer>,
     buffer: Res<HeightBuffer>,
@@ -228,6 +230,10 @@ pub fn render_lod(
     // };
 
     let Ok(transform) = player.single() else {
+        return;
+    };
+
+    let Ok(frustum) = projection.single() else {
         return;
     };
     // let translation = transform.translation;
@@ -310,7 +316,16 @@ pub fn render_lod(
     let root_node = MeshNode2::new(map_boundry, TREE_DEPTH - 1, false);
 
     let mut patches = Vec::new();
-    select_lod2(&root_node, TREE_DEPTH - 1, &bounding_spheres, &mut patches);
+    let mut culled_count = 0;
+    select_lod2(
+        &root_node,
+        TREE_DEPTH - 1,
+        &bounding_spheres,
+        &mut patches,
+        frustum,
+        &mut culled_count,
+    );
+    println!("CULLED: {culled_count}");
 
     // remove previous patches
     // println!("NUM PATCHES: {}", patches.len());
@@ -459,11 +474,11 @@ pub fn render_lod(
         let mat_handle = custom_materials.add(cust_mat);
         // let mesh_handle = patch_meshes[patch.level].clone();
         let wire_handle = wire_materials.add(wire_mat);
-        cdlod_state.materials.push(wire_handle.clone());
+        // cdlod_state.materials.push(wire_handle.clone());
         commands.spawn((
             Mesh3d(mesh_handle.clone()),
             MeshMaterial3d(mat_handle.clone()),
-            // NoFrustumCulling,
+            NoFrustumCulling,
             // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
             PatchLabel(frame_id),
         ));
@@ -472,7 +487,7 @@ pub fn render_lod(
             commands.spawn((
                 Mesh3d(mesh_handle.clone()),
                 MeshMaterial3d(wire_handle.clone()),
-                // NoFrustumCulling,
+                NoFrustumCulling,
                 // Transform::from_xyz(patch.center.x / 2.0, 0.0, patch.center.y / 2.0),
                 PatchLabel(frame_id),
             ));
@@ -526,13 +541,31 @@ fn select_lod2(
     level: usize,
     ranges: &Vec<BoundingSphere>,
     patches: &mut Vec<Patch>,
+    frustum: &Frustum,
+    culled_count: &mut i32,
 ) -> bool {
-    let lod_boundry = ranges[level];
-
     // If we are not within the range of the current level,
     // then skip node
+    let lod_boundry = ranges[level];
     if !node.boundry.intersects(&lod_boundry) {
         return false;
+    }
+    // let aabb = Aabb::from_min_max(node.boundry.min.into(), node.boundry.max.into());
+    let aabb_sphere = node.boundry.bounding_sphere();
+    let sphere = bevy::render::primitives::Sphere {
+        center: aabb_sphere.center,
+        radius: aabb_sphere.radius() * 0.8,
+    };
+    // let af3a = Affine3A::from_translation(node.boundry.center().into());
+    if !frustum.intersects_sphere(&sphere, true) {
+        // if !frustum.intersects_obb(&aabb, &af3a, true, true) {
+        // println!("culled");
+        // println!("{level}: {}", node.level);
+        *culled_count += 1;
+        // println!("culled {} {}", node.boundry.min, node.boundry.max);
+        // if level > TREE_DEPTH -
+
+        return true;
     }
 
     // At this point, we are within the current LOD range
@@ -558,7 +591,7 @@ fn select_lod2(
     // are within the next node
     else {
         for child in node.children() {
-            if !select_lod2(&child, level - 1, ranges, patches) {
+            if !select_lod2(&child, level - 1, ranges, patches, frustum, culled_count) {
                 // Child node not within next range, add part of current node
                 patches.push(Patch::new(child.boundry, level, true)); // true -> partial node
             }

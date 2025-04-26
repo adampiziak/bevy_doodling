@@ -89,7 +89,8 @@ fn main() {
         .insert_resource(TerrainState::default())
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
-            field1: Timer::from_seconds(0.2, TimerMode::Repeating),
+            field1: Timer::from_seconds(0.5, TimerMode::Repeating),
+            // field1: Timer::from_seconds(0.02, TimerMode::Repeating),
         })
         .add_systems(Startup, (setup, setup_mock_camera, setup_camera))
         .add_systems(
@@ -308,7 +309,7 @@ fn render_terrain(
         let box_mat = materials.add(box_mat);
         let data = &terrain_state.heightmap;
         println!("COMPUT FINISHED");
-        for _ in 0..500 {
+        for _ in 0..50000 {
             // let offset_x = random_range(-rand_offset..rand_offset);
             let offset_x = random_range(0_f32..rand_offset);
             // let offset_y = random_range(-rand_offset..rand_offset);
@@ -558,12 +559,12 @@ impl MaterialExtension for WireframeMaterial {
         Ok(())
     }
 }
-const TREE_DEPTH: usize = 4;
-const RANGE_MIN_DIS: f32 = 140.0;
+const TREE_DEPTH: usize = 3;
+const RANGE_MIN_DIS: f32 = 200.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
 
-const PATCH_SIZE: usize = 16;
+const PATCH_SIZE: usize = 32;
 #[derive(Component)]
 pub struct BoxLabel2;
 
