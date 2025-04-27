@@ -292,7 +292,7 @@ fn create_tree(center: Vec3, index_offset: u32) -> (Vec<Vec3>, Vec<u32>, Vec<Vec
     let mut indices = Vec::new();
     let mut uvs = Vec::new();
     // let tree_height = 1.6;
-    let tree_height = random_range(0.8_f32..4.0);
+    let tree_height = random_range(0.8_f32..4.0) * 0.8;
     let tree_base_width = random_range(0.2_f32..0.8);
     // let tree_base_width = 0.5;
     // let tree_height = 1.6 * 10.0;
@@ -309,7 +309,7 @@ fn create_tree(center: Vec3, index_offset: u32) -> (Vec<Vec3>, Vec<u32>, Vec<Vec
 
     for i in 0..num_faces {
         let indices_start = vertices.len() as u32 + index_offset;
-        let start_radians = face_offset * i as f32;
+        let start_radians = face_offset * i as f32 + PI / 4.0;
         let x1 = center.x + start_radians.cos() * tree_base_width;
         let x2 = center.x + (start_radians + PI).cos() * tree_base_width;
         let z1 = center.z + (start_radians).sin() * tree_base_width;
@@ -323,12 +323,17 @@ fn create_tree(center: Vec3, index_offset: u32) -> (Vec<Vec3>, Vec<u32>, Vec<Vec
         uvs.push(Vec2::new(0.0, 0.0) / uv_warp);
 
         indices.push(top_index); // top vertex
+        // if (x1 + z1 > x2 + z2) {
         indices.push(indices_start); // base right of triangle
         indices.push(indices_start + 1); // base left of triangle
-        //double sided
-        indices.push(top_index); // top vertex
-        indices.push(indices_start + 1); // base left of triangle
-        indices.push(indices_start); // base right of triangle
+        // } else {
+        // indices.push(indices_start); // base right of triangle
+        // indices.push(indices_start + 1); // base left of triangle
+        // }
+        // //double sided
+        // indices.push(top_index); // top vertex
+        // indices.push(indices_start + 1); // base left of triangle
+        // indices.push(indices_start); // base right of triangle
     }
 
     //
@@ -370,20 +375,26 @@ fn render_terrain(
         let mut forest_indices = Vec::new();
         let mut forest_uvs = Vec::new();
 
-        let num_trees = 1_000_000;
+        // let num_trees = 1_000_000;
+        let num_trees = 500_000;
         // let num_trees = 10_000;
         // let num_trees = 1;
         // let num_trees = 10;
         let mut tree_count = 0;
 
         while tree_count < num_trees {
-            let offset_x = random_range(0_f32..rand_offset);
-            let offset_z = random_range(0_f32..rand_offset);
+            let offset_x = random_range(2.0_f32..rand_offset - 2.0);
+            let offset_z = random_range(2.0_f32..rand_offset - 2.0);
 
             let i = offset_z.round() as usize * MAP_HEIGHT + offset_x as usize;
             let i = i.min(data.len() - 1);
             let height = data[i];
-            if height < 1.0 {
+            let roll = if height > 0.1 {
+                random_range(0.0_f32..height.powf(3.0))
+            } else {
+                0.05
+            };
+            if roll < 1.0 && height < 5.0 {
                 // println!("vertex count {}")
                 let (mut t_vers, mut t_inds, mut t_uvs) = create_tree(
                     Vec3::new(offset_x - 300.0, height, offset_z - 300.0),
@@ -434,8 +445,8 @@ fn render_terrain(
         forest_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, forest_uvs);
         forest_mesh.insert_indices(bevy::render::mesh::Indices::U32(forest_indices));
 
-        // forest_mesh.compute_smooth_normals();
-        // forest_mesh.generate_tangents().unwrap();
+        forest_mesh.compute_normals();
+        forest_mesh.generate_tangents().unwrap();
         let mesh = meshes.add(forest_mesh);
         let texture_handle = asset_server.load_with_settings("leaves.png", |s: &mut _| {
             *s = ImageLoaderSettings {
@@ -450,12 +461,16 @@ fn render_terrain(
         });
         let b = 1.8;
         let mat = StandardMaterial {
-            // perceptual_roughness: 0.5,
-            base_color: Color::srgba(b, b, b, 1.0),
+            perceptual_roughness: 1.0,
+            // base_color: Color::srgba(b, b, b, 1.0),
+            // double_sided: true,
             // base_color: Color::srgba(0.0, 0.0, 0.0, 0.0),
             base_color_texture: Some(texture_handle),
+            // thickness: 1.0,
+            // unlit: false,
             ..Default::default()
         };
+        // let mat = Color::WHITE;
         commands.spawn((Mesh3d(mesh), MeshMaterial3d(materials.add(mat)), BoxLabel2));
         compute_finished.clear();
     }
