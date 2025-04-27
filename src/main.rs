@@ -370,8 +370,8 @@ fn render_terrain(
         let mut forest_indices = Vec::new();
         let mut forest_uvs = Vec::new();
 
-        // let num_trees = 1_000_000;
-        let num_trees = 10_000;
+        let num_trees = 1_000_000;
+        // let num_trees = 10_000;
         // let num_trees = 1;
         // let num_trees = 10;
         let mut tree_count = 0;
