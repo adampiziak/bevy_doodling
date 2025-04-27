@@ -244,7 +244,7 @@ pub fn render_lod(
 
     timer.field1.tick(time.delta());
     if !timer.field1.just_finished() {
-        // return;
+        return;
         // update camera pos and skip
         let p = transform.translation;
         let cp = Vec4::from((p, 1.0));

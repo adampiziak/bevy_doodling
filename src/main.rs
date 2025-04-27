@@ -1,6 +1,7 @@
-use std::time::Duration;
+use std::{f32::consts::PI, time::Duration};
 
 use bevy::{
+    asset::RenderAssetUsages,
     color::palettes::css::{FOREST_GREEN, WHITE},
     dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
     pbr::{
@@ -89,7 +90,8 @@ fn main() {
         .insert_resource(TerrainState::default())
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
-            field1: Timer::from_seconds(3.0, TimerMode::Repeating),
+            // field1: Timer::from_seconds(3.0, TimerMode::Repeating),
+            field1: Timer::from_seconds(0.3, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.02, TimerMode::Repeating),
         })
         .add_systems(Startup, (setup, setup_mock_camera, setup_camera))
@@ -282,6 +284,44 @@ struct TerrainState {
     heightmap: Vec<f32>,
 }
 
+fn create_tree(center: Vec3, index_offset: u32) -> (Vec<Vec3>, Vec<u32>) {
+    let mut vertices = Vec::new();
+
+    let mut indices = Vec::new();
+    let tree_height = 2.0;
+    let tree_base_width = 1.0;
+    let num_faces = 2;
+
+    let face_offset = PI / num_faces as f32;
+
+    let top_vertex = center + Vec3::new(0.0, tree_height, 0.0);
+
+    for i in 0..num_faces {
+        let indices_start = vertices.len() as u32 + index_offset;
+        let start_radians = face_offset * i as f32;
+        let x1 = center.x + start_radians.cos() * tree_base_width;
+        let x2 = center.x + (start_radians + PI).cos() * tree_base_width;
+        let z1 = center.z + (start_radians).sin() * tree_base_width;
+        let z2 = center.z + (start_radians + PI).sin() * tree_base_width;
+
+        vertices.push(top_vertex);
+        vertices.push(Vec3::new(x1, center.y, z1));
+        vertices.push(Vec3::new(x2, center.y, z2));
+
+        indices.push(indices_start); // top vertex
+        indices.push(indices_start + 1); // base right of triangle
+        indices.push(indices_start + 2); // base left of triangle
+        //double sided
+        indices.push(indices_start); // top vertex
+        indices.push(indices_start + 2); // base left of triangle
+        indices.push(indices_start + 1); // base right of triangle
+    }
+
+    //
+
+    (vertices, indices)
+}
+
 fn render_terrain(
     mut compute_finished: EventReader<ComputeFinished>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -293,7 +333,7 @@ fn render_terrain(
 ) {
     if !compute_finished.is_empty() {
         let rand_offset: f32 = 600.0;
-        for (entity, label) in query.iter() {
+        for (entity, _) in query.iter() {
             commands.entity(entity).despawn();
         }
         // for (entity, label) in box_query.iter() {
@@ -303,56 +343,73 @@ fn render_terrain(
         // let tree =
         //     asset_server.load(GltfAssetLabel::Scene(0).from_asset("tree/scene.gltf"));
         // let box_mesh = meshes.add(Cuboid::from_size(Vec3::splat(2.0)));
-        let box_mesh = meshes.add(ConeMeshBuilder::new(0.6, 1.5, 3).build());
-        let mut box_mat: StandardMaterial = Color::from(FOREST_GREEN).darker(0.16).into();
-        box_mat.perceptual_roughness = 1.0;
-        let box_mat = materials.add(box_mat);
+        // let box_mesh = meshes.add(ConeMeshBuilder::new(0.6, 1.5, 3).build());
+        // let mut box_mat: StandardMaterial = Color::from(FOREST_GREEN).darker(0.16).into();
+        // box_mat.perceptual_roughness = 1.0;
+        // let box_mat = materials.add(box_mat);
         let data = &terrain_state.heightmap;
-        println!("COMPUT FINISHED");
-        for _ in 0..5 {
-            // let offset_x = random_range(-rand_offset..rand_offset);
-            let offset_x = random_range(0_f32..rand_offset);
-            // let offset_y = random_range(-rand_offset..rand_offset);
-            // let offset_z = random_range(-rand_offset..rand_offset);
-            let offset_z = random_range(0_f32..rand_offset);
+        // println!("COMPUT FINISHED");
 
-            // buffer.ob
-            //
+        let mut forest_mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
+
+        let mut forest_vertices = Vec::new();
+        let mut forest_indices = Vec::new();
+
+        let num_trees = 100000;
+
+        for _ in 0..num_trees {
+            let offset_x = random_range(0_f32..rand_offset);
+            let offset_z = random_range(0_f32..rand_offset);
 
             let i = offset_z.round() as usize * MAP_HEIGHT + offset_x as usize;
             let i = i.min(data.len() - 1);
             let height = data[i];
-            if height < 1.0 {
-                let hlod_co = 500.0;
-                let hbias = 0.5;
-                commands.spawn((
-                    // SceneRoot(tree.clone_weak()),
-                    Mesh3d(box_mesh.clone()),
-                    MeshMaterial3d(box_mat.clone()),
-                    BoxLabel2,
-                    NotShadowReceiver,
-                    // NotShadowCaster,
-                    VisibilityRange::abrupt(1.0, hlod_co),
-                    // NotShadowCaster,
-                    // Transform::from_xyz(0.0, 0.0, 0.0),
-                    Transform::from_xyz(offset_x - 300.0, height + hbias, offset_z - 300.0),
-                    // .with_scale(Vec3::splat(0.5)),
-                ));
-                commands.spawn((
-                    // SceneRoot(tree.clone_weak()),
-                    Mesh3d(box_mesh.clone()),
-                    MeshMaterial3d(box_mat.clone()),
-                    BoxLabel2,
-                    NotShadowReceiver,
-                    NotShadowCaster,
-                    VisibilityRange::abrupt(hlod_co, 700.0),
-                    // NotShadowCaster,
-                    // Transform::from_xyz(0.0, 0.0, 0.0),
-                    Transform::from_xyz(offset_x - 300.0, height + hbias, offset_z - 300.0),
-                    // .with_scale(Vec3::splat(0.5)),
-                ));
-            }
+            let (mut t_vers, mut t_inds) = create_tree(
+                Vec3::new(offset_x - 300.0, height, offset_z - 300.0),
+                forest_indices.len() as u32,
+            );
+            forest_vertices.append(&mut t_vers);
+            forest_indices.append(&mut t_inds);
+            // if height < 1.0 {
+            //     let hlod_co = 500.0;
+            //     let hbias = 0.5;
+            //     commands.spawn((
+            //         // SceneRoot(tree.clone_weak()),
+            //         Mesh3d(box_mesh.clone()),
+            //         MeshMaterial3d(box_mat.clone()),
+            //         BoxLabel2,
+            //         NotShadowReceiver,
+            //         // NotShadowCaster,
+            //         VisibilityRange::abrupt(1.0, hlod_co),
+            //         // NotShadowCaster,
+            //         // Transform::from_xyz(0.0, 0.0, 0.0),
+            //         Transform::from_xyz(offset_x - 300.0, height + hbias, offset_z - 300.0),
+            //         // .with_scale(Vec3::splat(0.5)),
+            //     ));
+            //     commands.spawn((
+            //         // SceneRoot(tree.clone_weak()),
+            //         Mesh3d(box_mesh.clone()),
+            //         MeshMaterial3d(box_mat.clone()),
+            //         BoxLabel2,
+            //         NotShadowReceiver,
+            //         NotShadowCaster,
+            //         VisibilityRange::abrupt(hlod_co, 700.0),
+            //         // NotShadowCaster,
+            //         // Transform::from_xyz(0.0, 0.0, 0.0),
+            //         Transform::from_xyz(offset_x - 300.0, height + hbias, offset_z - 300.0),
+            //         // .with_scale(Vec3::splat(0.5)),
+            //     ));
+            // }
         }
+
+        forest_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, forest_vertices);
+        forest_mesh.insert_indices(bevy::render::mesh::Indices::U32(forest_indices));
+
+        // forest_mesh.compute_normals();
+        // forest_mesh.generate_tangents().unwrap();
+        let mesh = meshes.add(forest_mesh);
+        let mat = materials.add(Color::srgb(0.1, 0.5, 0.2));
+        commands.spawn((Mesh3d(mesh), MeshMaterial3d(mat), BoxLabel2));
         compute_finished.clear();
     }
 }
