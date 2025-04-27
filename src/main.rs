@@ -309,7 +309,7 @@ fn create_tree(center: Vec3, index_offset: u32) -> (Vec<Vec3>, Vec<u32>, Vec<Vec
 
     for i in 0..num_faces {
         let indices_start = vertices.len() as u32 + index_offset;
-        let start_radians = face_offset * i as f32 + PI / 4.0;
+        let start_radians = face_offset * i as f32;
         let x1 = center.x + start_radians.cos() * tree_base_width;
         let x2 = center.x + (start_radians + PI).cos() * tree_base_width;
         let z1 = center.z + (start_radians).sin() * tree_base_width;
@@ -377,7 +377,7 @@ fn render_terrain(
 
         // let num_trees = 1_000_000;
         let num_trees = 500_000;
-        // let num_trees = 10_000;
+        // let num_trees = 100_000;
         // let num_trees = 1;
         // let num_trees = 10;
         let mut tree_count = 0;
@@ -463,7 +463,8 @@ fn render_terrain(
         let mat = StandardMaterial {
             perceptual_roughness: 1.0,
             // base_color: Color::srgba(b, b, b, 1.0),
-            // double_sided: true,
+            double_sided: true,
+            cull_mode: None,
             // base_color: Color::srgba(0.0, 0.0, 0.0, 0.0),
             base_color_texture: Some(texture_handle),
             // thickness: 1.0,
@@ -952,7 +953,7 @@ fn setup_camera(mut commands: Commands) {
     // });
     commands.spawn((
         DirectionalLight {
-            illuminance: 8_000.0,
+            illuminance: 6_000.0,
 
             shadows_enabled: true,
             ..default()
