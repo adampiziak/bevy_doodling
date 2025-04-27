@@ -4,6 +4,7 @@ use bevy::{
     asset::RenderAssetUsages,
     color::palettes::css::{FOREST_GREEN, WHITE},
     dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
+    image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
     pbr::{
         CascadeShadowConfigBuilder, ExtendedMaterial, MaterialExtension, NotShadowCaster,
         NotShadowReceiver, wireframe::WireframeConfig,
@@ -91,7 +92,8 @@ fn main() {
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
             // field1: Timer::from_seconds(3.0, TimerMode::Repeating),
-            field1: Timer::from_seconds(0.3, TimerMode::Repeating),
+            // field1: Timer::from_seconds(0.3, TimerMode::Repeating),
+            field1: Timer::from_seconds(0.05, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.02, TimerMode::Repeating),
         })
         .add_systems(Startup, (setup, setup_mock_camera, setup_camera))
@@ -284,17 +286,26 @@ struct TerrainState {
     heightmap: Vec<f32>,
 }
 
-fn create_tree(center: Vec3, index_offset: u32) -> (Vec<Vec3>, Vec<u32>) {
+fn create_tree(center: Vec3, index_offset: u32) -> (Vec<Vec3>, Vec<u32>, Vec<Vec2>) {
     let mut vertices = Vec::new();
 
     let mut indices = Vec::new();
-    let tree_height = 2.0;
-    let tree_base_width = 1.0;
+    let mut uvs = Vec::new();
+    // let tree_height = 1.6;
+    let tree_height = random_range(0.8_f32..4.0);
+    let tree_base_width = random_range(0.2_f32..0.8);
+    // let tree_base_width = 0.5;
+    // let tree_height = 1.6 * 10.0;
+    // let tree_base_width = 0.5 * 10.0;
     let num_faces = 2;
 
     let face_offset = PI / num_faces as f32;
+    let uv_warp = 10.0;
 
     let top_vertex = center + Vec3::new(0.0, tree_height, 0.0);
+    uvs.push(Vec2::new(0.5, 1.0) / uv_warp);
+    let top_index = index_offset;
+    vertices.push(top_vertex);
 
     for i in 0..num_faces {
         let indices_start = vertices.len() as u32 + index_offset;
@@ -304,22 +315,25 @@ fn create_tree(center: Vec3, index_offset: u32) -> (Vec<Vec3>, Vec<u32>) {
         let z1 = center.z + (start_radians).sin() * tree_base_width;
         let z2 = center.z + (start_radians + PI).sin() * tree_base_width;
 
-        vertices.push(top_vertex);
-        vertices.push(Vec3::new(x1, center.y, z1));
-        vertices.push(Vec3::new(x2, center.y, z2));
+        let vert1 = Vec3::new(x1, center.y, z1);
+        let vert2 = Vec3::new(x2, center.y, z2);
+        vertices.push(vert1);
+        vertices.push(vert2);
+        uvs.push(Vec2::new(1.0, 0.0) / uv_warp);
+        uvs.push(Vec2::new(0.0, 0.0) / uv_warp);
 
-        indices.push(indices_start); // top vertex
-        indices.push(indices_start + 1); // base right of triangle
-        indices.push(indices_start + 2); // base left of triangle
+        indices.push(top_index); // top vertex
+        indices.push(indices_start); // base right of triangle
+        indices.push(indices_start + 1); // base left of triangle
         //double sided
-        indices.push(indices_start); // top vertex
-        indices.push(indices_start + 2); // base left of triangle
-        indices.push(indices_start + 1); // base right of triangle
+        indices.push(top_index); // top vertex
+        indices.push(indices_start + 1); // base left of triangle
+        indices.push(indices_start); // base right of triangle
     }
 
     //
 
-    (vertices, indices)
+    (vertices, indices, uvs)
 }
 
 fn render_terrain(
@@ -328,7 +342,7 @@ fn render_terrain(
     terrain_state: Res<TerrainState>,
     mut commands: Commands,
     query: Query<(Entity, &BoxLabel2)>,
-
+    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     if !compute_finished.is_empty() {
@@ -354,23 +368,32 @@ fn render_terrain(
 
         let mut forest_vertices = Vec::new();
         let mut forest_indices = Vec::new();
+        let mut forest_uvs = Vec::new();
 
-        let num_trees = 100000;
+        // let num_trees = 1_000_000;
+        let num_trees = 10_000;
+        // let num_trees = 1;
+        // let num_trees = 10;
+        let mut tree_count = 0;
 
-        for _ in 0..num_trees {
+        while tree_count < num_trees {
             let offset_x = random_range(0_f32..rand_offset);
             let offset_z = random_range(0_f32..rand_offset);
 
             let i = offset_z.round() as usize * MAP_HEIGHT + offset_x as usize;
             let i = i.min(data.len() - 1);
             let height = data[i];
-            let (mut t_vers, mut t_inds) = create_tree(
-                Vec3::new(offset_x - 300.0, height, offset_z - 300.0),
-                forest_indices.len() as u32,
-            );
-            forest_vertices.append(&mut t_vers);
-            forest_indices.append(&mut t_inds);
-            // if height < 1.0 {
+            if height < 1.0 {
+                // println!("vertex count {}")
+                let (mut t_vers, mut t_inds, mut t_uvs) = create_tree(
+                    Vec3::new(offset_x - 300.0, height, offset_z - 300.0),
+                    forest_vertices.len() as u32,
+                );
+                forest_vertices.append(&mut t_vers);
+                forest_indices.append(&mut t_inds);
+                forest_uvs.append(&mut t_uvs);
+                tree_count += 1;
+            }
             //     let hlod_co = 500.0;
             //     let hbias = 0.5;
             //     commands.spawn((
@@ -402,14 +425,38 @@ fn render_terrain(
             // }
         }
 
+        // let uvs = forest_vertices
+        //     .iter()
+        //     .map(|v| v.xz())
+        //     .collect::<Vec<Vec2>>();
+
         forest_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, forest_vertices);
+        forest_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, forest_uvs);
         forest_mesh.insert_indices(bevy::render::mesh::Indices::U32(forest_indices));
 
-        // forest_mesh.compute_normals();
+        // forest_mesh.compute_smooth_normals();
         // forest_mesh.generate_tangents().unwrap();
         let mesh = meshes.add(forest_mesh);
-        let mat = materials.add(Color::srgb(0.1, 0.5, 0.2));
-        commands.spawn((Mesh3d(mesh), MeshMaterial3d(mat), BoxLabel2));
+        let texture_handle = asset_server.load_with_settings("leaves.png", |s: &mut _| {
+            *s = ImageLoaderSettings {
+                sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {
+                    // rewriting mode to repeat image,
+                    address_mode_u: ImageAddressMode::Repeat,
+                    address_mode_v: ImageAddressMode::Repeat,
+                    ..default()
+                }),
+                ..default()
+            }
+        });
+        let b = 1.8;
+        let mat = StandardMaterial {
+            // perceptual_roughness: 0.5,
+            base_color: Color::srgba(b, b, b, 1.0),
+            // base_color: Color::srgba(0.0, 0.0, 0.0, 0.0),
+            base_color_texture: Some(texture_handle),
+            ..Default::default()
+        };
+        commands.spawn((Mesh3d(mesh), MeshMaterial3d(materials.add(mat)), BoxLabel2));
         compute_finished.clear();
     }
 }
