@@ -92,8 +92,9 @@ fn main() {
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
             // field1: Timer::from_seconds(3.0, TimerMode::Repeating),
+            field1: Timer::from_seconds(2.0, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.3, TimerMode::Repeating),
-            field1: Timer::from_seconds(0.05, TimerMode::Repeating),
+            // field1: Timer::from_seconds(0.05, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.02, TimerMode::Repeating),
         })
         .add_systems(Startup, (setup, setup_mock_camera, setup_camera))
@@ -470,10 +471,12 @@ fn render_terrain(
                         ..default()
                     }
                 });
-                let b = 1.8;
+                let r = random_range(0.5_f32..1.1);
+                let g = random_range(0.5_f32..1.1);
+                let b = random_range(0.5_f32..1.1);
                 let mat = StandardMaterial {
                     perceptual_roughness: 1.0,
-                    base_color: Color::srgba(b, b, b, 1.0),
+                    base_color: Color::srgba(r, g, b, 1.0),
                     reflectance: 0.1,
                     double_sided: true,
                     cull_mode: None,
