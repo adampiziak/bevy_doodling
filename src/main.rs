@@ -351,128 +351,142 @@ fn render_terrain(
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     if !compute_finished.is_empty() {
-        let rand_offset: f32 = 600.0;
-        for (entity, _) in query.iter() {
-            commands.entity(entity).despawn();
-        }
-        // for (entity, label) in box_query.iter() {
-        //     ecommands.entity(entity).despawn();
-        // }
+        let chunk_divisions: usize = 8;
 
-        // let tree =
-        //     asset_server.load(GltfAssetLabel::Scene(0).from_asset("tree/scene.gltf"));
-        // let box_mesh = meshes.add(Cuboid::from_size(Vec3::splat(2.0)));
-        // let box_mesh = meshes.add(ConeMeshBuilder::new(0.6, 1.5, 3).build());
-        // let mut box_mat: StandardMaterial = Color::from(FOREST_GREEN).darker(0.16).into();
-        // box_mat.perceptual_roughness = 1.0;
-        // let box_mat = materials.add(box_mat);
-        let data = &terrain_state.heightmap;
-        // println!("COMPUT FINISHED");
+        let chunk_width: f32 = MAP_WIDTH as f32 / chunk_divisions as f32;
+        let num_trees = 300_000 / (chunk_divisions.pow(2));
 
-        let mut forest_mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
+        for chunk_x in 0..chunk_divisions {
+            for chunk_y in 0..chunk_divisions {
+                let chunk_start_x = chunk_x as f32 * chunk_width;
+                let chunk_start_y = chunk_y as f32 * chunk_width;
+                for (entity, _) in query.iter() {
+                    commands.entity(entity).despawn();
+                }
+                // for (entity, label) in box_query.iter() {
+                //     ecommands.entity(entity).despawn();
+                // }
 
-        let mut forest_vertices = Vec::new();
-        let mut forest_indices = Vec::new();
-        let mut forest_uvs = Vec::new();
+                // let tree =
+                //     asset_server.load(GltfAssetLabel::Scene(0).from_asset("tree/scene.gltf"));
+                // let box_mesh = meshes.add(Cuboid::from_size(Vec3::splat(2.0)));
+                // let box_mesh = meshes.add(ConeMeshBuilder::new(0.6, 1.5, 3).build());
+                // let mut box_mat: StandardMaterial = Color::from(FOREST_GREEN).darker(0.16).into();
+                // box_mat.perceptual_roughness = 1.0;
+                // let box_mat = materials.add(box_mat);
+                let data = &terrain_state.heightmap;
+                // println!("COMPUT FINISHED");
 
-        // let num_trees = 1_000_000;
-        let num_trees = 500_000;
-        // let num_trees = 100_000;
-        // let num_trees = 1;
-        // let num_trees = 10;
-        let mut tree_count = 0;
+                let mut forest_mesh =
+                    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
 
-        while tree_count < num_trees {
-            let offset_x = random_range(2.0_f32..rand_offset - 2.0);
-            let offset_z = random_range(2.0_f32..rand_offset - 2.0);
+                let mut forest_vertices = Vec::new();
+                let mut forest_indices = Vec::new();
+                let mut forest_uvs = Vec::new();
 
-            let i = offset_z.round() as usize * MAP_HEIGHT + offset_x as usize;
-            let i = i.min(data.len() - 1);
-            let height = data[i];
-            let roll = if height > 0.1 {
-                random_range(0.0_f32..height.powf(3.0))
-            } else {
-                0.05
-            };
-            if roll < 1.0 && height < 5.0 {
-                // println!("vertex count {}")
-                let (mut t_vers, mut t_inds, mut t_uvs) = create_tree(
-                    Vec3::new(offset_x - 300.0, height, offset_z - 300.0),
-                    forest_vertices.len() as u32,
-                );
-                forest_vertices.append(&mut t_vers);
-                forest_indices.append(&mut t_inds);
-                forest_uvs.append(&mut t_uvs);
-                tree_count += 1;
+                // let num_trees = 1_000_000;
+                // let num_trees = 100_000;
+                // let num_trees = 1;
+                // let num_trees = 10;
+                let mut tree_count = 0;
+
+                while tree_count < num_trees {
+                    let gap = 0.0;
+                    let offset_x =
+                        random_range((chunk_start_x + gap)..(chunk_start_x + chunk_width - gap));
+                    let offset_z =
+                        random_range((chunk_start_y + gap)..(chunk_start_y + chunk_width - gap));
+
+                    let i = offset_z.round() as usize * MAP_HEIGHT + offset_x as usize;
+                    let i = i.min(data.len() - 1);
+                    let height = data[i];
+                    let roll = if height > 0.1 {
+                        random_range(0.0_f32..height.powf(3.0))
+                    } else {
+                        0.05
+                    };
+                    if roll < 1.0 && height < 5.0 {
+                        // println!("vertex count {}")
+                        let (mut t_vers, mut t_inds, mut t_uvs) = create_tree(
+                            Vec3::new(offset_x - 300.0, height, offset_z - 300.0),
+                            forest_vertices.len() as u32,
+                        );
+                        forest_vertices.append(&mut t_vers);
+                        forest_indices.append(&mut t_inds);
+                        forest_uvs.append(&mut t_uvs);
+                        tree_count += 1;
+                    }
+                    //     let hlod_co = 500.0;
+                    //     let hbias = 0.5;
+                    //     commands.spawn((
+                    //         // SceneRoot(tree.clone_weak()),
+                    //         Mesh3d(box_mesh.clone()),
+                    //         MeshMaterial3d(box_mat.clone()),
+                    //         BoxLabel2,
+                    //         NotShadowReceiver,
+                    //         // NotShadowCaster,
+                    //         VisibilityRange::abrupt(1.0, hlod_co),
+                    //         // NotShadowCaster,
+                    //         // Transform::from_xyz(0.0, 0.0, 0.0),
+                    //         Transform::from_xyz(offset_x - 300.0, height + hbias, offset_z - 300.0),
+                    //         // .with_scale(Vec3::splat(0.5)),
+                    //     ));
+                    //     commands.spawn((
+                    //         // SceneRoot(tree.clone_weak()),
+                    //         Mesh3d(box_mesh.clone()),
+                    //         MeshMaterial3d(box_mat.clone()),
+                    //         BoxLabel2,
+                    //         NotShadowReceiver,
+                    //         NotShadowCaster,
+                    //         VisibilityRange::abrupt(hlod_co, 700.0),
+                    //         // NotShadowCaster,
+                    //         // Transform::from_xyz(0.0, 0.0, 0.0),
+                    //         Transform::from_xyz(offset_x - 300.0, height + hbias, offset_z - 300.0),
+                    //         // .with_scale(Vec3::splat(0.5)),
+                    //     ));
+                    // }
+                }
+
+                // let uvs = forest_vertices
+                //     .iter()
+                //     .map(|v| v.xz())
+                //     .collect::<Vec<Vec2>>();
+
+                forest_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, forest_vertices);
+                forest_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, forest_uvs);
+                forest_mesh.insert_indices(bevy::render::mesh::Indices::U32(forest_indices));
+
+                forest_mesh.compute_normals();
+                forest_mesh.generate_tangents().unwrap();
+                let mesh = meshes.add(forest_mesh);
+                let texture_handle = asset_server.load_with_settings("leaves.png", |s: &mut _| {
+                    *s = ImageLoaderSettings {
+                        sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {
+                            // rewriting mode to repeat image,
+                            address_mode_u: ImageAddressMode::Repeat,
+                            address_mode_v: ImageAddressMode::Repeat,
+                            ..default()
+                        }),
+                        ..default()
+                    }
+                });
+                let b = 1.8;
+                let mat = StandardMaterial {
+                    perceptual_roughness: 1.0,
+                    base_color: Color::srgba(b, b, b, 1.0),
+                    reflectance: 0.1,
+                    double_sided: true,
+                    cull_mode: None,
+                    // base_color: Color::srgba(0.0, , 0.0, 0.0),
+                    base_color_texture: Some(texture_handle),
+                    // thickness: 1.0,
+                    // unlit: false,
+                    ..Default::default()
+                };
+                // let mat = Color::WHITE;
+                commands.spawn((Mesh3d(mesh), MeshMaterial3d(materials.add(mat)), BoxLabel2));
             }
-            //     let hlod_co = 500.0;
-            //     let hbias = 0.5;
-            //     commands.spawn((
-            //         // SceneRoot(tree.clone_weak()),
-            //         Mesh3d(box_mesh.clone()),
-            //         MeshMaterial3d(box_mat.clone()),
-            //         BoxLabel2,
-            //         NotShadowReceiver,
-            //         // NotShadowCaster,
-            //         VisibilityRange::abrupt(1.0, hlod_co),
-            //         // NotShadowCaster,
-            //         // Transform::from_xyz(0.0, 0.0, 0.0),
-            //         Transform::from_xyz(offset_x - 300.0, height + hbias, offset_z - 300.0),
-            //         // .with_scale(Vec3::splat(0.5)),
-            //     ));
-            //     commands.spawn((
-            //         // SceneRoot(tree.clone_weak()),
-            //         Mesh3d(box_mesh.clone()),
-            //         MeshMaterial3d(box_mat.clone()),
-            //         BoxLabel2,
-            //         NotShadowReceiver,
-            //         NotShadowCaster,
-            //         VisibilityRange::abrupt(hlod_co, 700.0),
-            //         // NotShadowCaster,
-            //         // Transform::from_xyz(0.0, 0.0, 0.0),
-            //         Transform::from_xyz(offset_x - 300.0, height + hbias, offset_z - 300.0),
-            //         // .with_scale(Vec3::splat(0.5)),
-            //     ));
-            // }
         }
-
-        // let uvs = forest_vertices
-        //     .iter()
-        //     .map(|v| v.xz())
-        //     .collect::<Vec<Vec2>>();
-
-        forest_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, forest_vertices);
-        forest_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, forest_uvs);
-        forest_mesh.insert_indices(bevy::render::mesh::Indices::U32(forest_indices));
-
-        forest_mesh.compute_normals();
-        forest_mesh.generate_tangents().unwrap();
-        let mesh = meshes.add(forest_mesh);
-        let texture_handle = asset_server.load_with_settings("leaves.png", |s: &mut _| {
-            *s = ImageLoaderSettings {
-                sampler: ImageSampler::Descriptor(ImageSamplerDescriptor {
-                    // rewriting mode to repeat image,
-                    address_mode_u: ImageAddressMode::Repeat,
-                    address_mode_v: ImageAddressMode::Repeat,
-                    ..default()
-                }),
-                ..default()
-            }
-        });
-        let b = 1.8;
-        let mat = StandardMaterial {
-            perceptual_roughness: 1.0,
-            // base_color: Color::srgba(b, b, b, 1.0),
-            double_sided: true,
-            cull_mode: None,
-            // base_color: Color::srgba(0.0, 0.0, 0.0, 0.0),
-            base_color_texture: Some(texture_handle),
-            // thickness: 1.0,
-            // unlit: false,
-            ..Default::default()
-        };
-        // let mat = Color::WHITE;
-        commands.spawn((Mesh3d(mesh), MeshMaterial3d(materials.add(mat)), BoxLabel2));
         compute_finished.clear();
     }
 }
@@ -853,7 +867,7 @@ fn move_player(
     };
     let translation = transform.translation;
 
-    let mut speed = 60.0;
+    let mut speed = 30.0;
     if input.pressed(KeyCode::ControlLeft) {
         speed *= 4.0;
     }
@@ -960,6 +974,7 @@ fn setup_camera(mut commands: Commands) {
         },
         CascadeShadowConfigBuilder {
             num_cascades: 4,
+            first_cascade_far_bound: 400.0,
 
             maximum_distance: 1200.0,
             ..Default::default()
