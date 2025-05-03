@@ -391,6 +391,24 @@ fn render_terrain(
         let chunk_width: f32 = MAP_WIDTH as f32 / chunk_divisions as f32;
         let num_trees = 600_000 / (chunk_divisions.pow(2));
 
+        // let mountain_handle = compute_manager
+        //     .buffers
+        //     .get("MOUNTAIN")
+        //     .unwrap()
+        //     .handle
+        //     .clone()
+        //     .unwrap();
+
+        // if let Some(mbuffer) = buffers.get_mut(&mountain_handle) {
+        //     let mut mountains = Vec::new();
+        //     for _ in 0..10000 {
+        //         let x = random_range(0_f32..MAP_WIDTH as f32);
+        //         let z = random_range(0_f32..MAP_HEIGHT as f32);
+        //         mountains.push([x, 1.0, z, 1.0]);
+        //     }
+        //     mbuffer.set_data(mountains);
+        // }
+
         for chunk_x in 0..chunk_divisions {
             for chunk_y in 0..chunk_divisions {
                 let chunk_start_x = chunk_x as f32 * chunk_width;
@@ -447,7 +465,7 @@ fn render_terrain(
                     } else {
                         0.05
                     };
-                    if roll < 1.0 && height < 5.0 {
+                    if roll < 1.0 && height < 3.0 {
                         // println!("vertex count {}")
                         let (mut t_vers, mut t_inds, mut t_uvs) = create_tree(
                             Vec3::new(offset_x - 300.0, height, offset_z - 300.0),
@@ -587,10 +605,55 @@ impl Plugin for ComputePlugin {
         let heightmap_buffer = vec![0.0; vertex_count];
         let normal_buffer = vec![[0.0; 4]; vertex_count];
         let tangent_buffer = vec![[0.0; 4]; vertex_count];
+
+        let step_distance: f32 = 1.0; // Adjust this value as needed
+
+        // Define the maximum *change* in angle (in radians) per step
+        // Smaller value means smoother turns, larger means more erratic changes
+        let max_angle_change: f32 = PI / 16.0; // Example: max change of 11.25 degrees
+
+        // Initialize random number generator
+
+        // Start with a random initial direction (angle in radian
+        let mut mountains = Vec::new();
+        for _ in 0..5 {
+            let mut cursor = Vec4::new(
+                random_range(0.0..MAP_WIDTH as f32),
+                1.0,
+                random_range(0.0..MAP_HEIGHT as f32),
+                1.0,
+            );
+            let mut current_angle: f32 = random_range(0.0_f32..(2.0 * PI));
+
+            mountains.push(cursor.to_array()); // Add starting point
+
+            for _ in 0..500 {
+                // 1. Generate a small random change to the angle
+                let angle_delta: f32 = random_range(-max_angle_change..max_angle_change);
+
+                // 2. Update the current angle
+                current_angle += angle_delta;
+
+                // Optional: Keep the angle within the [0, 2*PI) range (helps prevent potential floating point issues with very large angles)
+                current_angle = current_angle.rem_euclid(2.0 * PI);
+
+                // 3. Calculate the step components (dx, dz) based on the new angle and fixed distance
+                let dx = step_distance * current_angle.cos();
+                let dz = step_distance * current_angle.sin();
+
+                // 4. Update the cursor position
+                cursor += Vec4::new(dx, 0.0, dz, 0.0);
+
+                // 5. Store the new position
+                // Assumes your Vec4 type has a `to_array()` method like glam::Vec4
+                mountains.push(cursor.to_array());
+            }
+        }
         let mut compute_manager = ComputeManager::default();
         compute_manager.add_buffer("HEIGHTMAP", ComputeBufferVector::F32(heightmap_buffer), 0);
         compute_manager.add_buffer("NORMAL", ComputeBufferVector::Vec4(normal_buffer), 1);
         compute_manager.add_buffer("TANGENT", ComputeBufferVector::Vec4(tangent_buffer), 2);
+        compute_manager.add_buffer("MOUNTAIN", ComputeBufferVector::Vec4(mountains), 3);
         // let mut buffer = ShaderStorageBuffer::from(heightmap_buffer);
         // buffer.buffer_description.usage |= BufferUsages::COPY_SRC;
         // let normal_buffer = ShaderStorageBuffer::from(normal_buffer);
@@ -832,7 +895,7 @@ impl MaterialExtension for WireframeMaterial {
         Ok(())
     }
 }
-const TREE_DEPTH: usize = 3;
+const TREE_DEPTH: usize = 4;
 const RANGE_MIN_DIS: f32 = 200.0;
 const MAP_WIDTH: usize = 600;
 const MAP_HEIGHT: usize = 600;
