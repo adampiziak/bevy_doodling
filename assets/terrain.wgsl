@@ -210,7 +210,7 @@ fn fragment(
     var h = max(in.world_position[1] + 0.5, 0.1);
     var f = 1.0/(1.0 + h/4.0);
     var new_in = in;
-    new_in.world_normal += mix(mountain_norms.xyz, grass_norms.xyz*0.5, f)*1.0;
+    new_in.world_normal += mix(mountain_norms.xyz, grass_norms.xyz*0.5, f)*0.6;
 
     
     var basecol = 1.0;

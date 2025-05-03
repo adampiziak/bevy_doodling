@@ -26,8 +26,8 @@ use kdtree::KdTree;
 use rand::{Rng, random_range, rng};
 
 use crate::{
-    CustomMaterial, EventTimer, HeightBuffer, MAP_HEIGHT, MAP_WIDTH, NormalBuffer, PATCH_SIZE,
-    PatchState, Player, RANGE_MIN_DIS, TREE_DEPTH, TangentBuffer, WireframeMaterial,
+    ComputeManager, CustomMaterial, EventTimer, HeightBuffer, MAP_HEIGHT, MAP_WIDTH, NormalBuffer,
+    PATCH_SIZE, PatchState, Player, RANGE_MIN_DIS, TREE_DEPTH, TangentBuffer, WireframeMaterial,
 };
 
 struct MeshNode2 {
@@ -211,9 +211,7 @@ pub fn render_lod(
         Query<&Frustum, With<Camera>>,
     ),
     asset_server: Res<AssetServer>,
-    buffer: Res<HeightBuffer>,
-    normal_buffer: Res<NormalBuffer>,
-    tangent_buffer: Res<TangentBuffer>,
+    compute_manager: Res<ComputeManager>,
     input: Res<ButtonInput<KeyCode>>,
     mut cdlod_state: ResMut<CdlodMaterials>,
     (mesh_query, box_query): (Query<(Entity, &PatchLabel)>, Query<(Entity, &BoxLabel2)>),
@@ -387,15 +385,21 @@ pub fn render_lod(
             patch_size,
             partial_flag,
         );
+        let buffer = compute_manager.buffers.get("HEIGHTMAP").unwrap();
+        let normal_buffer = compute_manager.buffers.get("NORMAL").unwrap();
+        let tanget_buffer = compute_manager.buffers.get("TANGENT").unwrap();
+        let buffer_handle = buffer.handle.clone().unwrap();
+        let normal_handle = normal_buffer.handle.clone().unwrap();
+        let tangent_handle = tanget_buffer.handle.clone().unwrap();
         let cust_mat = ExtendedMaterial {
             base: StandardMaterial {
                 perceptual_roughness: 1.0,
                 ..Default::default()
             },
             extension: CustomMaterial {
-                heightmap: buffer.0.clone(),
-                normals: normal_buffer.0.clone(),
-                tangents: tangent_buffer.0.clone(),
+                heightmap: buffer_handle.clone(),
+                normals: normal_handle.clone(),
+                tangents: tangent_handle.clone(),
                 level: patch_state,
                 color_texture: Some(asset_server.load_with_settings(
                     // "textures/grass01.png",
@@ -464,9 +468,9 @@ pub fn render_lod(
                 ..Default::default()
             },
             extension: WireframeMaterial {
-                heightmap: buffer.0.clone(),
-                normals: normal_buffer.0.clone(),
-                tangents: tangent_buffer.0.clone(),
+                heightmap: buffer_handle,
+                normals: normal_handle,
+                tangents: tangent_handle,
                 level: patch_state,
             },
         };

@@ -7,8 +7,9 @@ use bevy::{
     image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor},
     pbr::{
         CascadeShadowConfigBuilder, ExtendedMaterial, MaterialExtension, NotShadowCaster,
-        NotShadowReceiver, wireframe::WireframeConfig,
+        NotShadowReceiver, light_consts::lux::FULL_DAYLIGHT, wireframe::WireframeConfig,
     },
+    platform::collections::HashMap,
     prelude::*,
     render::{
         Render, RenderApp, RenderPlugin, RenderSet,
@@ -78,11 +79,13 @@ fn main() {
             },
             MaterialPlugin::<ExtendedMaterial<StandardMaterial, CustomMaterial>>::default(),
             MaterialPlugin::<ExtendedMaterial<StandardMaterial, WireframeMaterial>>::default(),
+            ExtractResourcePlugin::<ComputeManager>::default(),
+            ComputePlugin,
             GpuReadbackPlugin,
-            ExtractResourcePlugin::<HeightBuffer>::default(),
-            ExtractResourcePlugin::<NormalBuffer>::default(),
-            ExtractResourcePlugin::<TangentBuffer>::default(),
-            ExtractResourcePlugin::<HeightMapTexture>::default(),
+            // ExtractResourcePlugin::<HeightBuffer>::default(),
+            // ExtractResourcePlugin::<NormalBuffer>::default(),
+            // ExtractResourcePlugin::<TangentBuffer>::default(),
+            // ExtractResourcePlugin::<HeightMapTexture>::default(),
             ExtractResourcePlugin::<TerrainStageState>::default(),
         ))
         .add_event::<ComputeFinished>()
@@ -92,8 +95,8 @@ fn main() {
         .insert_resource(EnableWireframe::default())
         .insert_resource(EventTimer {
             // field1: Timer::from_seconds(3.0, TimerMode::Repeating),
-            field1: Timer::from_seconds(2.0, TimerMode::Repeating),
-            // field1: Timer::from_seconds(0.3, TimerMode::Repeating),
+            // field1: Timer::from_seconds(2.0, TimerMode::Repeating),
+            field1: Timer::from_seconds(0.3, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.05, TimerMode::Repeating),
             // field1: Timer::from_seconds(0.02, TimerMode::Repeating),
         })
@@ -175,8 +178,17 @@ struct GpuReadbackPlugin;
 impl Plugin for GpuReadbackPlugin {
     fn build(&self, _app: &mut App) {}
 
+    fn ready(&self, app: &App) -> bool {
+        // let render_app = app.sub_app(RenderApp);
+        println!("NOT READY");
+        std::thread::sleep(Duration::from_secs(1));
+        app.world().is_resource_added::<ComputeManager>()
+    }
+
     fn finish(&self, app: &mut App) {
+        let compute_manager = app.world().resource::<ComputeManager>().clone();
         let render_app = app.sub_app_mut(RenderApp);
+        render_app.insert_resource(compute_manager);
         render_app.init_resource::<ComputePipeline>().add_systems(
             Render,
             prepare_bind_group
@@ -192,6 +204,11 @@ impl Plugin for GpuReadbackPlugin {
             .resource_mut::<RenderGraph>()
             .add_node(ComputeNodeLabel, ComputeNode::default());
     }
+}
+
+// Compute Terrain Uniform
+struct ComputeTerrainData {
+    mountain_lines: Vec<Vec2>,
 }
 
 /// The node that will execute the compute shader
@@ -250,25 +267,42 @@ fn prepare_bind_group(
     mut commands: Commands,
     pipeline: Res<ComputePipeline>,
     render_device: Res<RenderDevice>,
-    buffer: Res<HeightBuffer>,
-    normal_buffer: Res<NormalBuffer>,
-    tangent_buffer: Res<TangentBuffer>,
+    // buffer: Res<HeightBuffer>,
+    // normal_buffer: Res<NormalBuffer>,
+    // tangent_buffer: Res<TangentBuffer>,
     buffers: Res<RenderAssets<GpuShaderStorageBuffer>>,
     // image: Res<HeightMapTexture>,
     // images: Res<RenderAssets<GpuImage>>,
+    compute_manager: Res<ComputeManager>,
 ) {
-    let buffer = buffers.get(&buffer.0).unwrap();
-    let tangent_buffer = buffers.get(&tangent_buffer.0).unwrap();
-    let normal_buffer = buffers.get(&normal_buffer.0).unwrap();
+    // let buffer = buffers.get(&buffer.0).unwrap();
+    // let tangent_buffer = buffers.get(&tangent_buffer.0).unwrap();
+    // let normal_buffer = buffers.get(&normal_buffer.0).unwrap();
+    let mut binding_array = Vec::new();
+
+    for (_, b) in &compute_manager.buffers {
+        // let l = match b.data {
+        //     ComputeBufferVector::F32(_) => storage_buffer::<Vec<f32>>(false),
+        //     ComputeBufferVector::Vec4(_) => storage_buffer::<Vec<[f32; 4]>>(false),
+        // };
+
+        let handle = b.handle.clone().unwrap();
+        let buffer = buffers.get(&handle).unwrap();
+
+        binding_array.push(BindGroupEntry {
+            binding: b.binding,
+            resource: buffer.buffer.as_entire_binding(),
+        });
+    }
 
     let bind_group = render_device.create_bind_group(
         None,
         &pipeline.layout,
-        &BindGroupEntries::sequential((
-            buffer.buffer.as_entire_buffer_binding(),
-            normal_buffer.buffer.as_entire_buffer_binding(),
-            tangent_buffer.buffer.as_entire_buffer_binding(),
-        )),
+        &binding_array, // &BindGroupEntries::sequential((
+                        //     buffer.buffer.as_entire_buffer_binding(),
+                        //     normal_buffer.buffer.as_entire_buffer_binding(),
+                        //     tangent_buffer.buffer.as_entire_buffer_binding(),
+                        // )),
     );
     commands.insert_resource(GpuBufferBindGroup(bind_group));
 }
@@ -294,11 +328,11 @@ fn create_tree(center: Vec3, index_offset: u32) -> (Vec<Vec3>, Vec<u32>, Vec<Vec
     let mut uvs = Vec::new();
     // let tree_height = 1.6;
     let tree_height = random_range(0.8_f32..4.0) * 0.8;
-    let tree_base_width = random_range(0.2_f32..0.8);
+    let tree_base_width = random_range(0.2_f32..0.8) * 1.5;
     // let tree_base_width = 0.5;
     // let tree_height = 1.6 * 10.0;
     // let tree_base_width = 0.5 * 10.0;
-    let num_faces = 2;
+    let num_faces = 3;
 
     let face_offset = PI / num_faces as f32;
     let uv_warp = 10.0;
@@ -355,7 +389,7 @@ fn render_terrain(
         let chunk_divisions: usize = 8;
 
         let chunk_width: f32 = MAP_WIDTH as f32 / chunk_divisions as f32;
-        let num_trees = 300_000 / (chunk_divisions.pow(2));
+        let num_trees = 600_000 / (chunk_divisions.pow(2));
 
         for chunk_x in 0..chunk_divisions {
             for chunk_y in 0..chunk_divisions {
@@ -389,14 +423,21 @@ fn render_terrain(
                 // let num_trees = 100_000;
                 // let num_trees = 1;
                 // let num_trees = 10;
-                let mut tree_count = 0;
 
-                while tree_count < num_trees {
+                for _ in 0..num_trees {
                     let gap = 0.0;
                     let offset_x =
                         random_range((chunk_start_x + gap)..(chunk_start_x + chunk_width - gap));
                     let offset_z =
                         random_range((chunk_start_y + gap)..(chunk_start_y + chunk_width - gap));
+
+                    if offset_x < 1.0
+                        || offset_x > (MAP_WIDTH as f32 - 1.0)
+                        || offset_z < 1.0
+                        || offset_z > (MAP_HEIGHT as f32 - 1.0)
+                    {
+                        continue;
+                    }
 
                     let i = offset_z.round() as usize * MAP_HEIGHT + offset_x as usize;
                     let i = i.min(data.len() - 1);
@@ -415,7 +456,6 @@ fn render_terrain(
                         forest_vertices.append(&mut t_vers);
                         forest_indices.append(&mut t_inds);
                         forest_uvs.append(&mut t_uvs);
-                        tree_count += 1;
                     }
                     //     let hlod_co = 500.0;
                     //     let hbias = 0.5;
@@ -474,10 +514,11 @@ fn render_terrain(
                 let r = random_range(0.5_f32..1.1);
                 let g = random_range(0.5_f32..1.1);
                 let b = random_range(0.5_f32..1.1);
+                let base = 0.55;
                 let mat = StandardMaterial {
                     perceptual_roughness: 1.0,
-                    base_color: Color::srgba(r, g, b, 1.0),
-                    reflectance: 0.1,
+                    base_color: Color::srgba(base, base, base + 0.12, 1.0),
+                    reflectance: 0.05,
                     double_sided: true,
                     cull_mode: None,
                     // base_color: Color::srgba(0.0, , 0.0, 0.0),
@@ -538,21 +579,116 @@ fn coordinate_compute(
     }
 }
 
+struct ComputePlugin;
+
+impl Plugin for ComputePlugin {
+    fn build(&self, app: &mut App) {
+        let vertex_count = MAP_HEIGHT * MAP_WIDTH;
+        let heightmap_buffer = vec![0.0; vertex_count];
+        let normal_buffer = vec![[0.0; 4]; vertex_count];
+        let tangent_buffer = vec![[0.0; 4]; vertex_count];
+        let mut compute_manager = ComputeManager::default();
+        compute_manager.add_buffer("HEIGHTMAP", ComputeBufferVector::F32(heightmap_buffer), 0);
+        compute_manager.add_buffer("NORMAL", ComputeBufferVector::Vec4(normal_buffer), 1);
+        compute_manager.add_buffer("TANGENT", ComputeBufferVector::Vec4(tangent_buffer), 2);
+        // let mut buffer = ShaderStorageBuffer::from(heightmap_buffer);
+        // buffer.buffer_description.usage |= BufferUsages::COPY_SRC;
+        // let normal_buffer = ShaderStorageBuffer::from(normal_buffer);
+        // let tangent_buffer = ShaderStorageBuffer::from(tangent_buffer);
+        // let buffer = buffers.add(buffer);
+        // let normal_buffer = buffers.add(normal_buffer);
+        // let tangent_buffer = buffers.add(tangent_buffer);
+
+        // let coordinator = ComputeCoordinater::new(
+        //     compute_manager
+        //         .buffers
+        //         .get("HEIGHTMAP")
+        //         .unwrap()
+        //         .handle
+        //         .clone(),
+        // );
+        app.world_mut().insert_resource(compute_manager);
+        println!("ADDED");
+    }
+
+    fn finish(&self, _app: &mut App) {}
+}
+
+#[derive(Resource, Default, ExtractResource, Clone)]
+struct ComputeManager {
+    pub buffers: HashMap<String, ComputeBuffer>,
+}
+
+impl ComputeManager {
+    fn generate_handles(&mut self, buffers: &mut ResMut<Assets<ShaderStorageBuffer>>) {
+        for (_, b) in self.buffers.iter_mut() {
+            let mut buffer = match b.data.clone() {
+                ComputeBufferVector::F32(data) => ShaderStorageBuffer::from(data),
+                ComputeBufferVector::Vec4(data) => ShaderStorageBuffer::from(data),
+            };
+            buffer.buffer_description.usage |= BufferUsages::COPY_SRC;
+            b.handle = Some(buffers.add(buffer));
+        }
+    }
+    fn add_buffer(&mut self, key: &str, data: ComputeBufferVector, binding: u32) {
+        // let mut shaderbuffer = match data.clone() {
+        //     ComputeBufferVector::F32(data) => ShaderStorageBuffer::from(data),
+        //     ComputeBufferVector::Vec4(data) => ShaderStorageBuffer::from(data),
+        // };
+
+        // shaderbuffer.buffer_description.usage |= BufferUsages::COPY_SRC;
+        // let handle = buffers.add(shaderbuffer);
+        self.buffers.insert(
+            key.into(),
+            ComputeBuffer {
+                binding,
+                data,
+                handle: None,
+            },
+        );
+    }
+}
+
+#[derive(Clone)]
+enum ComputeBufferVector {
+    F32(Vec<f32>),
+    Vec4(Vec<[f32; 4]>),
+}
+
+#[derive(Clone)]
+pub struct ComputeBuffer {
+    pub binding: u32,
+    pub data: ComputeBufferVector,
+    pub handle: Option<Handle<ShaderStorageBuffer>>,
+}
+
+// pub
+
 impl FromWorld for ComputePipeline {
     fn from_world(world: &mut World) -> Self {
+        // world.insert_resource(ComputeManager::default());
         let render_device = world.resource::<RenderDevice>();
         // let terrain_state = world.resource::<TerrainState>();
-        let layout = render_device.create_bind_group_layout(
-            None,
-            &BindGroupLayoutEntries::sequential(
-                ShaderStages::COMPUTE,
-                (
-                    storage_buffer::<Vec<f32>>(false),
-                    storage_buffer::<Vec<[f32; 4]>>(false),
-                    storage_buffer::<Vec<[f32; 4]>>(false),
-                ),
-            ),
-        );
+        let compute_manager = world.resource::<ComputeManager>();
+        let mut layout_array = Vec::new();
+
+        println!("---------");
+        for (_, b) in &compute_manager.buffers {
+            println!("BUFFER");
+            let l = match b.data {
+                ComputeBufferVector::F32(_) => storage_buffer::<Vec<f32>>(false),
+                ComputeBufferVector::Vec4(_) => storage_buffer::<Vec<[f32; 4]>>(false),
+            };
+            layout_array.push((b.binding, l));
+        }
+
+        layout_array.sort_by_key(|t| t.0);
+        let layouts: Vec<BindGroupLayoutEntry> = layout_array
+            .into_iter()
+            .map(|t| t.1.build(t.0, ShaderStages::COMPUTE))
+            .collect();
+
+        let layout = render_device.create_bind_group_layout(None, &layouts);
         let shader = world.load_asset(COMPUTE_SHADER_ASSET_PATH);
         let pipeline_cache = world.resource::<PipelineCache>();
         let pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
@@ -713,29 +849,27 @@ fn setup(
     mut buffers: ResMut<Assets<ShaderStorageBuffer>>,
     mut custom_materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, CustomMaterial>>>,
     asset_server: Res<AssetServer>,
+    mut compute_manager: ResMut<ComputeManager>,
 ) {
     let terrain_state = TerrainStageState::default();
-    let vertex_count = MAP_HEIGHT * MAP_WIDTH;
-    let heightmap_buffer = vec![0.0; vertex_count];
-    let normal_buffer = vec![[0.0; 4]; vertex_count];
-    let tangent_buffer = vec![[0.0; 4]; vertex_count];
-    let mut buffer = ShaderStorageBuffer::from(heightmap_buffer);
-    buffer.buffer_description.usage |= BufferUsages::COPY_SRC;
-    let normal_buffer = ShaderStorageBuffer::from(normal_buffer);
-    let tangent_buffer = ShaderStorageBuffer::from(tangent_buffer);
-    let buffer = buffers.add(buffer);
-    let normal_buffer = buffers.add(normal_buffer);
-    let tangent_buffer = buffers.add(tangent_buffer);
+    compute_manager.generate_handles(&mut buffers);
+    let coordinater = ComputeCoordinater::new(
+        compute_manager
+            .buffers
+            .get("HEIGHTMAP")
+            .unwrap()
+            .handle
+            .clone()
+            .unwrap(),
+    );
 
-    let coordinator = ComputeCoordinater::new(buffer.clone());
-    commands.insert_resource(coordinator);
-
-    // trees
-    // buffer.read
+    // // trees
+    // // buffer.read
     commands.insert_resource(terrain_state);
-    commands.insert_resource(HeightBuffer(buffer));
-    commands.insert_resource(NormalBuffer(normal_buffer));
-    commands.insert_resource(TangentBuffer(tangent_buffer));
+    commands.insert_resource(coordinater);
+    // commands.insert_resource(HeightBuffer(buffer));
+    // commands.insert_resource(NormalBuffer(normal_buffer));
+    // commands.insert_resource(TangentBuffer(tangent_buffer));
 }
 
 #[derive(PartialEq)]
@@ -970,7 +1104,7 @@ fn setup_camera(mut commands: Commands) {
     // });
     commands.spawn((
         DirectionalLight {
-            illuminance: 6_000.0,
+            illuminance: 9000.0,
 
             shadows_enabled: true,
             ..default()
@@ -986,7 +1120,7 @@ fn setup_camera(mut commands: Commands) {
         Transform::from_xyz(0.0, 300.0, 0.0).looking_to(
             Vec3 {
                 x: -0.5,
-                y: -0.3,
+                y: -0.15,
                 z: 0.5,
             },
             Vec3::Y,
