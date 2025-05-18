@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 # bevy = { version = "0.15", features = ["bevy_dev_tools", "dynamic_linking", "bevy_image"] }
 bevy = { version = "0.16.0", features = ["bevy_dev_tools", "dynamic_linking"] }
+bevy_app_compute = "0.16.0"
 kdtree = "0.7.0"
 noise = "0.9.0"
 noisy_bevy = "0.8.0"
